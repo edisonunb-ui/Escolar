@@ -1,0 +1,20 @@
+export const perguntasComLogicaInvertida = new Set([
+  'extintoresObstruidos',
+  'infiltracoesOuGoteiras',
+  'buracosNasParedes',
+  'janelasComVidrosQuebrados',
+  'lampadasQueimadas',
+  'fiosExpostos',
+  'lixoNoPatio',
+  'matagalNoPatio',
+  'vasosComAguaParada',
+  'parqueComBrinquedosQuebrados',
+  'parqueSemPisoAdequado',
+  'parqueComObjetosPerigosos',
+  'materiaisInadequados',
+  'livrosRasgados',
+  'bebidasNaoDisponiveis',
+  'alimentosTexturaInadequada',
+  'frutasEVerdurasAusentes',
+  'cardapioNaoAfixado'
+]);

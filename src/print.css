@@ -1,0 +1,26 @@
+
+/* Oculta os botões de navegação e outros elementos da interface ao imprimir */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  /* Garante que todas as seções do formulário sejam visíveis */
+  .printable-section {
+    display: block !important;
+    page-break-inside: avoid; /* Tenta evitar que uma seção seja cortada entre duas páginas */
+  }
+
+  /* Garante que o contêiner principal se expanda para mostrar todo o conteúdo */
+  .printable-container {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Estilos gerais para melhorar a legibilidade da impressão */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
