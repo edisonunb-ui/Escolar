@@ -22,33 +22,22 @@ export default function PesquisasSalvas() {
     setLoading(true);
     setError(null);
     try {
-      const crechesRef = collection(db, 'pesquisasCreche');
-      const crechesSnapshot = await getDocs(crechesRef);
-      const pesquisasCreche = crechesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          nome: data.nomeCreche,
-          tipo: 'Creche' as 'Creche',
-          data: data.timestamp?.toDate().toLocaleDateString('pt-BR') || 'Data não disponível',
-          timestamp: data.timestamp
-        };
-      });
-
-      const escolasRef = collection(db, 'pesquisasEscola');
-      const escolasSnapshot = await getDocs(escolasRef);
-      const pesquisasEscola = escolasSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          nome: data.nomeEscola,
-          tipo: 'Escola' as 'Escola',
-          data: data.timestamp?.toDate().toLocaleDateString('pt-BR') || 'Data não disponível',
-          timestamp: data.timestamp
-        };
-      });
+      const diligenciasRef = collection(db, 'diligencias');
+      const diligenciasSnapshot = await getDocs(diligenciasRef);
       
-      const todasPesquisas = [...pesquisasCreche, ...pesquisasEscola];
+      const todasPesquisas = diligenciasSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const tipo = data.tipificacao === 'Creche' ? 'Creche' : 'Escola';
+        const nome = data.nomeCreche || data.nomeEscola || 'Sem Nome';
+        
+        return {
+          id: doc.id,
+          nome,
+          tipo: tipo as 'Creche' | 'Escola',
+          data: data.timestamp?.toDate().toLocaleDateString('pt-BR') || 'Data não disponível',
+          timestamp: data.timestamp
+        };
+      });
       todasPesquisas.sort((a, b) => {
         if (a.timestamp && b.timestamp) {
           return b.timestamp.toMillis() - a.timestamp.toMillis();
@@ -69,10 +58,9 @@ export default function PesquisasSalvas() {
     fetchPesquisas();
   }, []);
 
-  const handleDelete = async (id: string, tipo: 'Creche' | 'Escola') => {
+  const handleDelete = async (id: string) => {
     try {
-      const collectionName = tipo === 'Creche' ? 'pesquisasCreche' : 'pesquisasEscola';
-      await deleteDoc(doc(db, collectionName, id));
+      await deleteDoc(doc(db, 'diligencias', id));
       setPesquisas(pesquisas.filter(p => p.id !== id));
     } catch (error) {
       console.error("Erro ao excluir pesquisa:", error);
@@ -119,7 +107,7 @@ export default function PesquisasSalvas() {
                   {confirmingDelete === pesquisa.id ? (
                     <>
                       <button
-                        onClick={() => handleDelete(pesquisa.id, pesquisa.tipo)}
+                        onClick={() => handleDelete(pesquisa.id)}
                         className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded transition-colors text-sm whitespace-nowrap"
                       >
                         Confirmar Exclusão

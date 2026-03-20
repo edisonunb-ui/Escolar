@@ -24,22 +24,15 @@ export default function DetalhePesquisa() {
     const fetchPesquisa = async () => {
       setLoading(true);
       try {
-        let docRef = doc(db, 'pesquisasCreche', id);
-        let docSnap = await getDoc(docRef);
+        const docRef = doc(db, 'diligencias', id);
+        const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setPesquisa({ id: docSnap.id, ...docSnap.data() });
-          setTipoPesquisa('Creche');
+          const data = docSnap.data();
+          setPesquisa({ id: docSnap.id, ...data });
+          setTipoPesquisa(data.tipificacao === 'Creche' ? 'Creche' : 'Escola');
         } else {
-          docRef = doc(db, 'pesquisasEscola', id);
-          docSnap = await getDoc(docRef);
-
-          if (docSnap.exists()) {
-            setPesquisa({ id: docSnap.id, ...docSnap.data() });
-            setTipoPesquisa('Escola');
-          } else {
-            setError('Nenhum documento encontrado com este ID.');
-          }
+          setError('Nenhum documento encontrado com este ID.');
         }
       } catch (err) {
         console.error("Erro ao buscar documento:", err);
@@ -65,8 +58,7 @@ export default function DetalhePesquisa() {
     }
 
     try {
-      const collectionName = tipoPesquisa === 'Creche' ? 'pesquisasCreche' : 'pesquisasEscola';
-      await deleteDoc(doc(db, collectionName, id));
+      await deleteDoc(doc(db, 'diligencias', id));
       navigate('/pesquisas-salvas');
     } catch (error) {
       console.error("Erro ao excluir pesquisa:", error);

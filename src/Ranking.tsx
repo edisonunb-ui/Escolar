@@ -48,15 +48,15 @@ export default function Ranking() {
         let pontosDaPesquisa = 0;
         let totalPerguntasDaPesquisa = 0;
 
-        Object.entries(pesquisa).forEach(([chave, valor]) => {
-          if (typeof valor === 'boolean') {
+        Object.entries(pesquisa.respostas || {}).forEach(([chave, valor]: [string, any]) => {
+          if (valor && typeof valor.conforme === 'boolean') {
             totalPerguntasDaPesquisa++;
             if (perguntasComLogicaInvertida.has(chave)) {
-              if (valor === false) {
+              if (valor.conforme === false) {
                 pontosDaPesquisa++;
               }
             } else {
-              if (valor === true) {
+              if (valor.conforme === true) {
                 pontosDaPesquisa++;
               }
             }
@@ -89,13 +89,19 @@ export default function Ranking() {
     const fetchDados = async () => {
       setLoading(true);
       try {
-        const [pesquisasCrecheSnapshot, pesquisasEscolaSnapshot] = await Promise.all([
-          getDocs(collection(db, 'pesquisasCreche')),
-          getDocs(collection(db, 'pesquisasEscola'))
-        ]);
+        const diligenciasSnapshot = await getDocs(collection(db, 'diligencias'));
 
-        const dadosCrecheDocs = pesquisasCrecheSnapshot.docs.map(doc => doc.data());
-        const dadosEscolaDocs = pesquisasEscolaSnapshot.docs.map(doc => doc.data());
+        const dadosCrecheDocs: any[] = [];
+        const dadosEscolaDocs: any[] = [];
+
+        diligenciasSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.tipificacao === 'Creche') {
+            dadosCrecheDocs.push(data);
+          } else {
+            dadosEscolaDocs.push(data);
+          }
+        });
 
         setDadosCreches(calcularRanking(dadosCrecheDocs));
         setDadosEscolas(calcularRanking(dadosEscolaDocs));
