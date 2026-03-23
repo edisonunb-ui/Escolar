@@ -1,28 +1,43 @@
-
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { app } from './firebaseConfig'; // Importa a instância do app Firebase
-
-const storage = getStorage(app);
-
 /**
- * Faz o upload de uma imagem em formato Data URL (base64) para o Firebase Storage.
- * 
- * @param path - O caminho no Storage onde a imagem será salva (ex: 'avaliacoes/escola-xyz/foto.jpg')
- * @param imageDataUrl - A string da imagem em formato Data URL.
- * @returns A URL de download da imagem após o upload.
+ * Este arquivo inicialmente enviava fotos para o Firebase Storage.
+ * Como o Firebase Storage exige faturamento no plano Spark para o bucket padrão em alguns casos,
+ * migramos o envio de fotos de forma 100% gratuita para o Cloudinary usando a REST API pública.
  */
-export const uploadImage = async (path: string, imageDataUrl: string): Promise<string> => {
-  const storageRef = ref(storage, path);
-  try {
-    // Faz o upload da string em formato data_url
-    const snapshot = await uploadString(storageRef, imageDataUrl, 'data_url');
-    console.log('Uploaded a data_url string!', snapshot);
 
-    // Pega a URL de download
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
-  } catch (error) {
-    console.error("Erro no upload da imagem:", error);
-    throw new Error('Falha ao enviar a imagem.');
+export const uploadImage = async (path: string, imageDataUrl: string): Promise<string> => {
+  const CLOUD_NAME = 'drwg0adxt';
+  const UPLOAD_PRESET = 'fotos_diligencias';
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+
+  try {
+    console.log(`Iniciando upload para Cloudinary...`);
+    
+    const formData = new FormData();
+    formData.append('file', imageDataUrl);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    
+    // Opcional: tenta usar o começo do path como pasta no Cloudinary
+    const destFolder = path.includes('/') ? path.split('/')[0] : 'diligencias';
+    formData.append('folder', destFolder);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Erro da API do Cloudinary:", errorData);
+      throw new Error(errorData.error?.message || 'Falha ao enviar a imagem para o Cloudinary.');
+    }
+
+    const data = await response.json();
+    console.log('Upload para o Cloudinary concluído com sucesso!', data.secure_url);
+
+    // Retorna a URL final da imagem hospedada
+    return data.secure_url;
+  } catch (error: any) {
+    console.error("Erro CRÍTICO no upload da imagem:", error);
+    throw new Error(error.message || 'Falha ao enviar a imagem para o servidor.');
   }
 };
