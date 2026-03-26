@@ -8,7 +8,8 @@ import Questionario from './Questionario';
 import QuestionarioCreche from './QuestionarioCreche';
 import QuestionarioEscolar from './QuestionarioEscolar';
 import Header from './Header';
-import RelatorioPage from './RelatorioPage'; // Importa a nova página
+import RelatorioPage from './RelatorioPage';
+import DashboardPage from './DashboardPage';
 
 function App() {
   return (
@@ -21,7 +22,8 @@ function App() {
           <Route path="/pesquisas-salvas" element={<PesquisasSalvas />} />
           <Route path="/pesquisa/:id" element={<DetalhePesquisa />} />
           <Route path="/ranking" element={<Ranking />} />
-          <Route path="/relatorio/:id" element={<RelatorioPage />} /> {/* Rota ajustada */}
+          <Route path="/relatorio" element={<DashboardPage />} />
+          <Route path="/relatorio/:id" element={<RelatorioPage />} />
 
           {/* Novas rotas para os formulários específicos */}
           <Route path="/formulario/creche" element={<QuestionarioCreche />} />

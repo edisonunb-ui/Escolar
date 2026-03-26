@@ -5,17 +5,17 @@
  */
 
 export const uploadImage = async (path: string, imageDataUrl: string): Promise<string> => {
-  const CLOUD_NAME = 'drwg0adxt';
-  const UPLOAD_PRESET = 'fotos_diligencias';
+  const CLOUD_NAME = 'drwg0sdat';
+  const UPLOAD_PRESET = 'fotos_diligências';
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
   try {
     console.log(`Iniciando upload para Cloudinary...`);
-    
+
     const formData = new FormData();
     formData.append('file', imageDataUrl);
     formData.append('upload_preset', UPLOAD_PRESET);
-    
+
     // Opcional: tenta usar o começo do path como pasta no Cloudinary
     const destFolder = path.includes('/') ? path.split('/')[0] : 'diligencias';
     formData.append('folder', destFolder);

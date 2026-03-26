@@ -5,6 +5,7 @@ import { doc, getDoc, DocumentData, deleteDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import QuestionarioCreche from './QuestionarioCreche';
 import QuestionarioEscolar from './QuestionarioEscolar';
+import RelatorioImpressao from './RelatorioImpressao';
 
 export default function DetalhePesquisa() {
   const { id } = useParams<{ id: string }>();
@@ -60,8 +61,8 @@ export default function DetalhePesquisa() {
     try {
       await deleteDoc(doc(db, 'diligencias', id));
       navigate('/pesquisas-salvas');
-    } catch (error) {
-      console.error("Erro ao excluir pesquisa:", error);
+    } catch (err) {
+      console.error("Erro ao excluir pesquisa:", err);
       setError("Falha ao excluir a pesquisa. Por favor, tente novamente.");
     } finally {
       setConfirmingDelete(false);
@@ -69,7 +70,7 @@ export default function DetalhePesquisa() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto bg-background rounded-lg shadow printable-area printable-container">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto bg-background rounded-lg shadow">
        <style>
         {`
           @media print {
@@ -77,28 +78,20 @@ export default function DetalhePesquisa() {
               background-color: #fff !important;
               color: #000 !important;
             }
-            nav, .no-print {
+            nav, .no-print, header {
               display: none !important;
             }
-            .printable-area {
-              box-shadow: none;
-              border: none;
-              padding: 0;
-              margin: 0;
-              max-width: 100%;
-              background-color: #fff !important; 
+            main {
+              padding: 0 !important;
+              margin: 0 !important;
             }
-             .printable-area * {
-              color: #000 !important;
-              background-color: #fff !important;
-            }
-            section {
-              border: 1px solid #ddd;
-              page-break-inside: avoid;
+            /* Esconder a visualização do questionário na impressão */
+            .screen-only {
+              display: none !important;
             }
           }
         `}
-      </style>
+       </style>
 
       {loading && <p className="text-center text-text-secondary no-print">Carregando dados...</p>}
       {error && (
@@ -150,11 +143,16 @@ export default function DetalhePesquisa() {
             )}
           </div>
 
-          {tipoPesquisa === 'Creche' && 
-            <QuestionarioCreche initialData={pesquisa} isReadOnly={true} />}
-          
-          {tipoPesquisa === 'Escola' && 
-            <QuestionarioEscolar initialData={pesquisa} isReadOnly={true} />}
+          <div className="screen-only">
+            {tipoPesquisa === 'Creche' && 
+              <QuestionarioCreche initialData={pesquisa} isReadOnly={true} />}
+            
+            {tipoPesquisa === 'Escola' && 
+              <QuestionarioEscolar initialData={pesquisa} isReadOnly={true} />}
+          </div>
+
+          {/* Relatório profissional visível apenas na impressão */}
+          <RelatorioImpressao data={pesquisa} />
         </div>
       )}
     </div>

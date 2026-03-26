@@ -295,7 +295,10 @@ export default function Relatorio({ data }: RelatorioProps) {
         {/* 8. Conclusão Técnica */}
         <RelatorioHeader title="8. Conclusão Técnica" />
         <p className="text-gray-700 print:text-sm">
-            Com base na análise, a unidade apresenta condições <strong>{statusGeral.split(' ')[1].toLowerCase()}</strong>. 
+            Com base na análise, a unidade apresenta condições <strong>{
+              statusGeral.includes('Inadequado') ? 'inadequadas' : 
+              statusGeral.includes('Parcialmente') ? 'parcialmente adequadas' : 'adequadas'
+            }</strong>. 
             O índice de conformidade de <strong>{conformidadeGeral.toFixed(1)}%</strong> e a presença de não conformidades de risco <strong>{riscoGeral}</strong> indicam
             a necessidade de intervenção {riscoGeral === 'Crítico' || riscoGeral === 'Alto' ? 'prioritária e urgente' : 'para melhoria contínua'}.
             Recomenda-se o seguimento rigoroso das ações corretivas listadas.

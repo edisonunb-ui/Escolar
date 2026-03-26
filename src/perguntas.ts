@@ -1,20 +1,7 @@
-export const perguntasComLogicaInvertida = new Set([
-  'extintoresObstruidos',
-  'infiltracoesOuGoteiras',
-  'buracosNasParedes',
-  'janelasComVidrosQuebrados',
-  'lampadasQueimadas',
-  'fiosExpostos',
-  'lixoNoPatio',
-  'matagalNoPatio',
-  'vasosComAguaParada',
-  'parqueComBrinquedosQuebrados',
-  'parqueSemPisoAdequado',
-  'parqueComObjetosPerigosos',
-  'materiaisInadequados',
-  'livrosRasgados',
-  'bebidasNaoDisponiveis',
-  'alimentosTexturaInadequada',
-  'frutasEVerdurasAusentes',
-  'cardapioNaoAfixado'
-]);
+import { checklistCreche, checklistEscola } from './diligenciaConfig';
+
+export const perguntasComLogicaInvertida = new Set(
+  [...checklistCreche, ...checklistEscola]
+    .filter(item => item.logicaInvertida)
+    .map(item => item.id)
+);

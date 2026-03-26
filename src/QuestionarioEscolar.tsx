@@ -68,8 +68,9 @@ const VerificationItem: React.FC<{
     localPhotos: string[];
     onChange: (itemId: string, value: Partial<RespostaItem>) => void; 
     onOpenCamera: (targetId: string) => void;
+    onImageClick?: (url: string) => void;
     disabled?: boolean; 
-}> = ({ item, resposta, localPhotos, onChange, onOpenCamera, disabled }) => {
+}> = ({ item, resposta, localPhotos, onChange, onOpenCamera, onImageClick, disabled }) => {
     const isNaoConforme = resposta.conforme === (item.logicaInvertida ? true : false);
     const exigeJustificativa = isNaoConforme && (item.obsObrigatoria || item.fotoObrigatoria);
 
@@ -99,13 +100,17 @@ const VerificationItem: React.FC<{
                             disabled={disabled}
                         />
                     )}
-                    {(item.fotoObrigatoria || !disabled) && (
+                    {(!disabled || (resposta.fotos && resposta.fotos.length > 0)) && (
                         <div className="mt-2">
-                             <button type="button" onClick={() => onOpenCamera(item.id)} className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded disabled:opacity-50" disabled={disabled}>Anexar Foto</button>
-                             {item.fotoObrigatoria && <p className="text-xs text-yellow-400 mt-1 inline-block ml-2">* Anexo de foto é obrigatório.</p>}
-                             <div className="flex gap-2 mt-2">
-                                 {resposta.fotos.map(url => <img key={url} src={url} className="w-16 h-16 rounded object-cover" />)}
-                                 {localPhotos.map((dataUrl, i) => <img key={i} src={dataUrl} className="w-16 h-16 rounded object-cover border-2 border-blue-500" />)}
+                             {!disabled && (
+                                 <>
+                                     <button type="button" onClick={() => onOpenCamera(item.id)} className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded disabled:opacity-50 no-print" disabled={disabled}>Anexar Foto</button>
+                                     {item.fotoObrigatoria && <p className="text-xs text-yellow-400 mt-1 inline-block ml-2 no-print">* Anexo de foto é obrigatório.</p>}
+                                 </>
+                             )}
+                             <div className="flex gap-2 mt-2 flex-wrap">
+                                 {resposta.fotos?.map(url => <img key={url} src={url} onClick={() => onImageClick?.(url)} className="w-24 h-24 rounded object-cover border border-gray-400 cursor-pointer hover:opacity-80 transition-opacity" alt="Foto anexada" />)}
+                                 {localPhotos?.map((dataUrl, i) => <img key={i} src={dataUrl} onClick={() => onImageClick?.(dataUrl)} className="w-24 h-24 rounded object-cover border-2 border-blue-500 cursor-pointer hover:opacity-80 transition-opacity" alt="Preview local" />)}
                              </div>
                         </div>
                     )}
@@ -123,6 +128,7 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [currentPhotoTarget, setCurrentPhotoTarget] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   
   const [localPhotoPreviews, setLocalPhotoPreviews] = useState<Record<string, string[]>>({});
   const [localPhotosData, setLocalPhotosData] = useState<Record<string, string[]>>({});
@@ -290,11 +296,33 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
   return (
     <div className="p-2 sm:p-4 max-w-5xl mx-auto bg-gray-900 text-white">
         {isCameraOpen && <CameraComponent onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}
+
+        {/* Lightbox para visualizar fotos em tamanho original */}
+        {lightboxUrl && (
+          <div
+            className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <button
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-4 right-4 text-white text-3xl font-bold bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/80 transition-colors z-10"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+            <img
+              src={lightboxUrl}
+              alt="Foto em tamanho original"
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
         
         <h1 className="text-xl sm:text-2xl font-bold mb-4">{isReadOnly ? `Visualizando: ${formData.nomeEscola}` : '🏫 Checklist de Conformidade — Escolas'}</h1>
 
         {secoes.map((sec, secIndex) => (
-            <div key={secIndex} className={activeSection === secIndex ? 'block' : 'hidden'}>
+            <div key={secIndex} className={isReadOnly || activeSection === secIndex ? 'block mb-8' : 'hidden'}>
                 {secIndex === 0 ? (
                     <Section title="1. Identificação da Diligência">
                         <label className="block mb-2 text-sm font-medium">Nome da Escola *</label>
@@ -333,7 +361,7 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
                         {sec.subsecoes.map(sub => (
                             <SubSection key={sub.titulo} title={sub.titulo}>
                                 {sub.itens.map(item => (
-                                    <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} disabled={isReadOnly}/>
+                                    <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
                                 ))}
                             </SubSection>
                         ))}

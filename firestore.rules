@@ -2,27 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regras para a coleção de pesquisas de creches
-    match /pesquisasCreche/{document=**} {
-      // Qualquer pessoa pode ler (necessário para o ranking público).
-      allow read: if true;
-      // Apenas para desenvolvimento: permite que qualquer pessoa crie, atualize ou apague. 
-      // ATENÇÃO: Para produção, restrinja o acesso a usuários autenticados.
-      allow write, delete: if true; 
-    }
-
-    // Regras para a coleção de pesquisas de escolas
-    match /pesquisasEscola/{document=**} {
-      // Qualquer pessoa pode ler.
-      allow read: if true;
-      // Apenas para desenvolvimento: permite que qualquer pessoa crie, atualize ou apague.
-      // ATENÇÃO: Para produção, restrinja o acesso a usuários autenticados.
-      allow write, delete: if true; 
-    }
-
-    // Nega acesso a todas as outras coleções por padrão.
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
