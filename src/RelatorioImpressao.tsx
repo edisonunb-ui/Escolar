@@ -8,7 +8,7 @@ interface RelatorioImpressaoProps {
 }
 
 interface RespostaItem {
-  conforme: boolean | null;
+  conforme: string | boolean | null;
   observacao: string;
   fotos: string[];
 }
@@ -43,7 +43,7 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
     if (!data || !data.respostas) return null;
 
     const checklist = data.tipificacao === 'Creche' ? checklistCreche : checklistEscola;
-    const respostas = data.respostas as Record<string, RespostaItem>;
+    const respostas = data.respostas as Record<string, any>;
     const nomeUnidade = data.nomeCreche || data.nomeEscola || 'Sem Nome';
     const tipo = data.tipificacao || 'Escola';
 
@@ -54,9 +54,15 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
       if (!secoesMap[item.secao]) {
         secoesMap[item.secao] = { titulo: item.secao, itens: [] };
       }
-      const resposta = respostas[item.id] || null;
-      const conforme = !resposta || resposta.conforme === null || 
-        (item.logicaInvertida ? resposta.conforme === false : resposta.conforme === true);
+      const respRaw = respostas[item.id];
+      const conformeValue = typeof respRaw === 'object' ? respRaw?.conforme : respRaw;
+      const observacao = typeof respRaw === 'object' ? respRaw?.observacao : '';
+      const fotos = data.fotosGerais?.[item.id] || [];
+      
+      const resposta: RespostaItem = { conforme: conformeValue, observacao, fotos };
+      
+      // Ajuste para lidar com boolean ou string 'SIM'
+      const conforme = conformeValue === 'SIM' || conformeValue === true;
       
       secoesMap[item.secao].itens.push({ item, resposta, conforme });
     });
@@ -80,12 +86,12 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
       ? data.timestamp.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
       : 'Data não disponível';
 
-    return { nomeUnidade, tipo, secoes, totalItens, totalConformes, percentualGeral, naoConformidades, dataVistoria };
+    return { nomeUnidade, tipo, secoes, totalItens, totalConformes, percentualGeral, naoConformidades, dataVistoria, checklist };
   }, [data]);
 
   if (!analise) return null;
 
-  const { nomeUnidade, tipo, secoes, totalItens, totalConformes, percentualGeral, naoConformidades, dataVistoria } = analise;
+  const { nomeUnidade, tipo, secoes, totalItens, totalConformes, percentualGeral, naoConformidades, dataVistoria, checklist } = analise;
 
   const getStatusLabel = (pct: number) => {
     if (pct >= 80) return '✅ Adequado';
@@ -93,270 +99,63 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
     return '❌ Inadequado';
   };
 
+  const isCreche = data.tipificacao === 'Creche';
+
   return (
     <div className="relatorio-impressao">
       <style>{`
-        .relatorio-impressao {
-          display: none;
+        .relatorio-impressao { 
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+          color: #1a202c; 
+          background: white; 
+          padding: 30px; 
+          border-radius: 8px; 
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          max-width: 210mm;
+          margin: 0 auto;
         }
-
         @media print {
-          /* Esconder header, nav e conteúdo de tela */
-          body > #root > * > header,
-          body > #root > * > main > * > .no-print,
-          body > #root > * > main > * > .screen-only {
-            display: none !important;
-          }
-
-          body, html {
-            background: #fff !important;
-          }
-
-          .relatorio-impressao {
-            display: block !important;
-            position: relative;
-            width: 100%;
-            background: #fff !important;
-          }
-
-          /* Reset geral para impressão */
-          .relatorio-impressao, .relatorio-impressao * {
-            color: #1a1a1a !important;
-            background: #fff !important;
-            font-family: 'Segoe UI', 'Arial', sans-serif !important;
-          }
-
-          .relatorio-impressao {
-            padding: 15mm 15mm 20mm 15mm;
-            font-size: 11pt;
-            line-height: 1.5;
-          }
-
-          .ri-header {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            border-bottom: 3px solid #1a365d;
-            padding-bottom: 12px;
-            margin-bottom: 20px;
-          }
-
-          .ri-header img {
-            width: 70px;
-            height: auto;
-          }
-
-          .ri-header-text {
-            flex: 1;
-          }
-
-          .ri-header-text h1 {
-            font-size: 16pt;
-            font-weight: 800;
-            color: #1a365d !important;
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-
-          .ri-header-text p {
-            font-size: 10pt;
-            color: #4a5568 !important;
-            margin: 2px 0 0 0;
-          }
-
-          .ri-section-title {
-            font-size: 12pt;
-            font-weight: 700;
-            color: #1a365d !important;
-            border-bottom: 2px solid #2b6cb0;
-            padding-bottom: 4px;
-            margin: 24px 0 12px 0;
-            page-break-after: avoid;
-          }
-
-          .ri-info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px 24px;
-            margin-bottom: 16px;
-          }
-
-          .ri-info-item {
-            display: flex;
-            gap: 6px;
-            font-size: 10pt;
-          }
-
-          .ri-info-label {
-            font-weight: 600;
-            color: #4a5568 !important;
-            min-width: 140px;
-          }
-
-          .ri-info-value {
-            font-weight: 400;
-          }
-
-          .ri-resumo-box {
-            border: 2px solid #2b6cb0;
-            border-radius: 6px;
-            padding: 12px 16px;
-            margin: 12px 0 20px 0;
-            page-break-inside: avoid;
-          }
-
-          .ri-resumo-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
-            text-align: center;
-          }
-
-          .ri-resumo-item {
-            padding: 8px;
-          }
-
-          .ri-resumo-item .ri-big-number {
-            font-size: 20pt;
-            font-weight: 800;
-            line-height: 1.2;
-          }
-
-          .ri-resumo-item .ri-label {
-            font-size: 8pt;
-            color: #718096 !important;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-
-          .ri-bar-container {
-            background: #e2e8f0 !important;
-            height: 12px;
-            border-radius: 6px;
-            margin-top: 8px;
-            overflow: hidden;
-          }
-
-          .ri-bar-fill {
-            height: 100%;
-            border-radius: 6px;
-            background: #2b6cb0 !important;
-          }
-
-          /* Tabelas */
-          .ri-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9pt;
-            margin: 8px 0 16px 0;
-          }
-
-          .ri-table th {
-            background: #edf2f7 !important;
-            font-weight: 700;
-            text-align: left;
-            padding: 6px 8px;
-            border: 1px solid #cbd5e0;
-            color: #2d3748 !important;
-            font-size: 8pt;
-            text-transform: uppercase;
-          }
-
-          .ri-table td {
-            padding: 5px 8px;
-            border: 1px solid #e2e8f0;
-            vertical-align: top;
-          }
-
-          .ri-table tr {
-            page-break-inside: avoid;
-          }
-
-          .ri-conforme { color: #276749 !important; font-weight: 600; }
-          .ri-nao-conforme { color: #c53030 !important; font-weight: 600; }
-
-          /* Seção de conformidade por área */
-          .ri-secao-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            page-break-inside: avoid;
-          }
-
-          .ri-secao-card h4 {
-            font-size: 10pt;
-            font-weight: 700;
-            margin: 0 0 4px 0;
-          }
-
-          .ri-secao-card .ri-secao-stats {
-            display: flex;
-            gap: 16px;
-            font-size: 9pt;
-          }
-
-          /* Fotos */
-          .ri-fotos-section {
-            page-break-before: auto;
-          }
-
-          .ri-foto-group {
-            page-break-inside: avoid;
-            margin-bottom: 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            padding: 8px;
-          }
-
-          .ri-foto-group h4 {
-            font-size: 9pt;
-            font-weight: 600;
-            margin: 0 0 6px 0;
-          }
-
-          .ri-foto-grid {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-          }
-
-          .ri-foto-grid img {
-            width: 180px;
-            height: auto;
-            border-radius: 4px;
-            border: 1px solid #cbd5e0;
-          }
-
-          .ri-footer {
-            margin-top: 40px;
-            text-align: center;
-            border-top: 2px solid #1a365d;
-            padding-top: 16px;
-            page-break-inside: avoid;
-          }
-
-          .ri-footer .ri-assinatura {
-            display: inline-block;
-            border-top: 1px solid #4a5568;
-            padding-top: 6px;
-            min-width: 250px;
-            margin-top: 50px;
-          }
-
-          .ri-objetivo {
-            font-style: italic;
-            font-size: 10pt;
-            color: #4a5568 !important;
-            margin: 8px 0;
-          }
+          .relatorio-impressao { display: block !important; padding: 20mm; background: white; box-shadow: none; border-radius: 0; max-width: none; margin: 0; }
+          .no-print { display: none !important; }
+          body { background: white !important; }
         }
+        .ri-header { display: flex; align-items: center; border-bottom: 2px solid #2d3748; padding-bottom: 15px; margin-bottom: 20px; }
+        .ri-header img { height: 60px; margin-right: 20px; }
+        .ri-header-text h1 { font-size: 18pt; margin: 0; color: #2d3748; }
+        .ri-header-text p { font-size: 10pt; margin: 0; color: #718096; }
+        .ri-section-title { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #cbd5e0; margin-top: 25px; margin-bottom: 10px; color: #2b6cb0; page-break-after: avoid; }
+        .ri-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .ri-info-item { font-size: 10pt; }
+        .ri-info-label { font-weight: bold; color: #4a5568; margin-right: 5px; }
+        .ri-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9pt; }
+        .ri-table th, .ri-table td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+        .ri-table th { background-color: #f7fafc; color: #4a5568; font-weight: bold; text-transform: uppercase; font-size: 8pt; }
+        .ri-conforme { color: #38a169; font-weight: bold; }
+        .ri-nao-conforme { color: #e53e3e; font-weight: bold; }
+        .ri-resumo-box { border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .ri-resumo-grid { display: flex; justify-content: space-around; text-align: center; }
+        .ri-big-number { font-size: 20pt; font-weight: bold; color: #2d3748; }
+        .ri-label { font-size: 8pt; color: #718096; text-transform: uppercase; }
+        .ri-foto-group { margin-bottom: 20px; page-break-inside: avoid; }
+        .ri-foto-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .ri-foto-grid img { width: 48%; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .ri-footer { margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        .ri-assinatura { border-top: 1px solid #2d3748; display: inline-block; padding-top: 10px; min-width: 300px; margin-top: 40px; }
       `}</style>
+      
+      {/* Botão de Impressão no Topo (apenas tela) */}
+      <div className="no-print flex justify-end mb-6">
+          <button 
+            onClick={() => window.print()} 
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg font-bold transition-all transform hover:scale-105"
+          >
+            <span>🖨️</span> Imprimir / Gerar PDF
+          </button>
+      </div>
 
       {/* === CABEÇALHO === */}
       <div className="ri-header">
-        <img src={logo} alt="Brasão da Câmara Municipal" />
+        <img src={logo} alt="Logo" />
         <div className="ri-header-text">
           <h1>Relatório de Diligência Técnica</h1>
           <p>Câmara Municipal de Ubatuba — Fiscaliza Ubatuba</p>
@@ -364,52 +163,177 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
       </div>
 
       {/* === 1. IDENTIFICAÇÃO === */}
-      <h2 className="ri-section-title">1. Identificação da Diligência</h2>
+      <h2 className="ri-section-title">1. Dados de Identificação e Tipificação</h2>
       <div className="ri-info-grid">
-        <div className="ri-info-item">
-          <span className="ri-info-label">Instituição:</span>
-          <span className="ri-info-value"><strong>{nomeUnidade}</strong></span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Tipo:</span>
-          <span className="ri-info-value">{tipo}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Data da Vistoria:</span>
-          <span className="ri-info-value">{dataVistoria}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Diretor(a):</span>
-          <span className="ri-info-value">{data.nomeDiretor || '—'}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Total de Alunos:</span>
-          <span className="ri-info-value">{data.totalAlunos || '—'}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Frequentando:</span>
-          <span className="ri-info-value">{data.alunosFrequentando || '—'}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Evasão:</span>
-          <span className="ri-info-value">{data.evasao || '—'}</span>
-        </div>
-        <div className="ri-info-item">
-          <span className="ri-info-label">Prestação de Contas:</span>
-          <span className="ri-info-value">{data.prestacaoContas || '—'}</span>
-        </div>
+        <div className="ri-info-item"><span className="ri-info-label">{isCreche ? 'Creche:' : 'Escola:'}</span> {nomeUnidade}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Tipo:</span> {tipo} — {data.tipificacaoUnidade || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Data:</span> {dataVistoria}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Diretor(a):</span> {data.nomeDiretor || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Região:</span> {data.regiao || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Telefone:</span> {data.telefone || '—'}</div>
+        <div className="ri-info-item" style={{ gridColumn: 'span 2' }}><span className="ri-info-label">Endereço:</span> {data.endereco ? `${data.endereco} - ${data.bairro}` : '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Total Alunos:</span> {data.totalAlunos || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Frequentando:</span> {data.alunosFrequentando || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Evasão:</span> {data.evasao || '—'}</div>
+        <div className="ri-info-item"><span className="ri-info-label">Prestação Contas:</span> {data.prestacaoContas || '—'}</div>
       </div>
 
-      {/* === 2. OBJETIVO === */}
-      <h2 className="ri-section-title">2. Objetivo da Vistoria</h2>
-      <p className="ri-objetivo">
-        Avaliar as condições estruturais, operacionais e de segurança da instituição de ensino, 
-        a fim de identificar não conformidades, diagnosticar riscos e fornecer recomendações técnicas 
-        para subsidiar a fiscalização e a tomada de decisão pelo poder público.
-      </p>
+      {/* === 2. QUADRO FUNCIONAL === */}
+      {isCreche ? (
+          data.quadroFuncionalCreche && (
+              <>
+                <h2 className="ri-section-title">2. Quadro Funcional e Recursos Humanos</h2>
+                <table className="ri-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '50%' }}>Função / Categoria</th>
+                      <th style={{ width: '15%' }}>Qtd</th>
+                      <th style={{ width: '35%' }}>Vínculo / Obs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                      {[
+                          { id: 'berçário', label: 'Agentes Educacionais/Cuidadores (Berçário)' },
+                          { id: 'miniGrupos', label: 'Agentes Educacionais/Cuidadores (Mini-Grupos)' },
+                          { id: 'profEfetivos', label: 'Professores Efetivos' },
+                          { id: 'merendeiras', label: 'Merendeiras' },
+                          { id: 'outros', label: 'Outros Funcionários (Limpeza, etc.)' },
+                      ].map(row => (
+                          <tr key={row.id}>
+                              <td>{row.label}</td>
+                              <td style={{ textAlign: 'center' }}>{data.quadroFuncionalCreche[row.id]?.quantidade || '0'}</td>
+                              <td>{data.quadroFuncionalCreche[row.id]?.vinculo || '—'}</td>
+                          </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {/* Itens de checklist da seção 2 (se houver) */}
+                {secoes.find(s => s.titulo.startsWith('2.'))?.itens.map(({ item, resposta, conforme }) => (
+                    <div key={item.id} style={{ fontSize: '9pt', marginBottom: '5px' }}>
+                         <strong>{item.texto}</strong> — <span className={conforme ? 'ri-conforme' : 'ri-nao-conforme'}>{conforme ? 'SIM' : 'NÃO'}</span> {resposta?.observacao && `(${resposta.observacao})`}
+                    </div>
+                ))}
+              </>
+          ) || null
+      ) : (
+        data.quadroFuncional && (
+            <>
+              <h2 className="ri-section-title">2. Quadro Funcional e Recursos Humanos</h2>
+              <table className="ri-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50%' }}>Função / Categoria</th>
+                    <th style={{ width: '15%' }}>Qtd</th>
+                    <th style={{ width: '35%' }}>Vínculo / Obs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                    {[
+                        { id: 'agentes', label: 'Agentes Educacionais' },
+                        { id: 'profEfetivos', label: 'Professores Efetivos' },
+                        { id: 'profEventuais', label: 'Professores Eventuais' },
+                        { id: 'merendeirasMat', label: 'Merendeiras (Mat)' },
+                        { id: 'merendeirasVesp', label: 'Merendeiras (Vesp)' },
+                        { id: 'merendeirasNot', label: 'Merendeiras (Not)' },
+                        { id: 'outros', label: 'Outros Funcionários' },
+                    ].map(row => (
+                        <tr key={row.id}>
+                            <td>{row.label}</td>
+                            <td style={{ textAlign: 'center' }}>{data.quadroFuncional[row.id]?.quantidade || '0'}</td>
+                            <td>{data.quadroFuncional[row.id]?.vinculo || '—'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+              </table>
+              <table className="ri-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50%' }}>Equipe Técnica</th>
+                    <th style={{ width: '15%' }}>Qtd</th>
+                    <th style={{ width: '35%' }}>Vínculo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                    {[
+                        { id: 'assistenteSocial', label: 'Assistente Social' },
+                        { id: 'psicologo', label: 'Psicólogo' },
+                        { id: 'psicopedagogo', label: 'Psicopedagogo' },
+                        { id: 'fonoaudiologo', label: 'Fonoaudiólogo' },
+                    ].map(row => (
+                        <tr key={row.id}>
+                            <td>{row.label}</td>
+                            <td style={{ textAlign: 'center' }}>{data.equipeTecnica?.[row.id]?.quantidade || '0'}</td>
+                            <td>{data.equipeTecnica?.[row.id]?.vinculo || '—'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+              </table>
+            </>
+          ) || null
+      )}
 
-      {/* === 3. RESUMO EXECUTIVO === */}
-      <h2 className="ri-section-title">3. Resumo Executivo</h2>
+      {/* === 6. DESCRITIVAS (ESCOLA) / ÁREAS ESPECÍFICAS (CRECHE) === */}
+      {!isCreche && data.perguntasDescritivas && (
+        <>
+          <h2 className="ri-section-title">6. Perguntas Descritivas (Atuação e Registro)</h2>
+          <div style={{ fontSize: '10pt', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <p><strong>Frequência (As.Soc/Psico):</strong> {data.perguntasDescritivas.freqAssisPsico || '—'}</p>
+            <p><strong>Frequência (Psicoped/Fono):</strong> {data.perguntasDescritivas.freqPsicoFono || '—'}</p>
+            <p><strong>Registro/Prontuários:</strong> {data.perguntasDescritivas.registroAtendimentos || '—'}</p>
+            <p><strong>Integração/Relatórios:</strong> {data.perguntasDescritivas.integracaoRelatorios || '—'}</p>
+          </div>
+        </>
+      )}
+
+      {/* === DEMAIS CHECKLIST SECTIONS (3, 4, 5, 6, 7) === */}
+      {secoes.filter(s => s.titulo.startsWith('3.') || s.titulo.startsWith('4.') || s.titulo.startsWith('5.') || s.titulo.startsWith('6.') || s.titulo.startsWith('7.')).map(secao => (
+        <React.Fragment key={secao.titulo}>
+          {/* Evitar duplicar a seção 6 se for escola (já tratada acima como descritiva) */}
+          {!( !isCreche && secao.titulo.startsWith('6.') ) && (
+              <>
+                <h2 className="ri-section-title">{secao.titulo}</h2>
+                <table className="ri-table">
+                    <thead>
+                    <tr>
+                        <th style={{ width: '70%' }}>Item de Verificação</th>
+                        <th style={{ width: '10%' }}>Conf.</th>
+                        <th style={{ width: '20%' }}>Observações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {secao.itens.map(({ item, resposta, conforme }) => (
+                        <tr key={item.id}>
+                        <td>{item.texto}</td>
+                        <td className={conforme ? 'ri-conforme' : 'ri-nao-conforme'}>
+                            {conforme ? 'SIM' : 'NÃO'}
+                        </td>
+                        <td>{resposta?.observacao || '—'}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+              </>
+          )}
+        </React.Fragment>
+      ))}
+
+      {/* === 8. RESUMO / OBSERVAÇÕES (CRECHE) === */}
+      {isCreche && data.observacoesCreche && (
+          <>
+            <h2 className="ri-section-title">8. Observações e Adequações</h2>
+            <div style={{ fontSize: '10pt', border: '1px solid #e2e8f0', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <p><strong>Observações Gerais:</strong> {data.observacoesCreche.gerais || '—'}</p>
+                <div style={{ padding: '8px', background: '#fff5f5', border: '1px solid #fed7d7' }}>
+                    <strong>Adequações Prioritárias:</strong> {data.observacoesCreche.adequacoes || '—'}
+                </div>
+                <div style={{ padding: '8px', background: '#fefcbf', border: '1px solid #faf089' }}>
+                    <strong>Orientação do CAE/Responsável:</strong> {data.observacoesCreche.orientacoesCAE || '—'}
+                </div>
+            </div>
+          </>
+      )}
+
+      <h2 className="ri-section-title">{isCreche ? '9.' : '8.'} Resumo Executivo e Métricas</h2>
       <div className="ri-resumo-box">
         <div className="ri-resumo-grid">
           <div className="ri-resumo-item">
@@ -425,123 +349,65 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
             <div className="ri-label">Status Geral</div>
           </div>
         </div>
-        <div className="ri-bar-container">
-          <div className="ri-bar-fill" style={{ width: `${percentualGeral}%` }}></div>
-        </div>
       </div>
 
-      {/* === 4. CONFORMIDADE POR ÁREA === */}
-      <h2 className="ri-section-title">4. Conformidade por Área</h2>
-      {secoes.map((sec) => (
-        <div key={sec.titulo} className="ri-secao-card">
-          <h4>{sec.titulo}</h4>
-          <div className="ri-secao-stats">
-            <span>Conformidade: <strong>{sec.percentual.toFixed(0)}%</strong></span>
-            <span className="ri-conforme">✓ {sec.conformes} conforme(s)</span>
-            <span className="ri-nao-conforme">✗ {sec.naoConformes} não conforme(s)</span>
-          </div>
-          <div className="ri-bar-container">
-            <div className="ri-bar-fill" style={{ width: `${sec.percentual}%` }}></div>
-          </div>
-        </div>
-      ))}
-
-      {/* === 5. DETALHAMENTO COMPLETO === */}
-      <h2 className="ri-section-title">5. Detalhamento dos Itens Avaliados</h2>
-      {secoes.map(sec => (
-        <React.Fragment key={sec.titulo}>
-          <h4 style={{ fontSize: '10pt', fontWeight: 700, margin: '12px 0 4px 0' }}>{sec.titulo}</h4>
+      <h2 className="ri-section-title">{isCreche ? '10.' : '9.'} Não Conformidades Identificadas</h2>
+      {naoConformidades.length > 0 ? (
           <table className="ri-table">
             <thead>
               <tr>
-                <th style={{ width: '55%' }}>Item de Verificação</th>
-                <th style={{ width: '10%' }}>Situação</th>
-                <th style={{ width: '10%' }}>Risco</th>
-                <th style={{ width: '25%' }}>Observação</th>
+                <th style={{ width: '40%' }}>Área / Item</th>
+                <th style={{ width: '15%' }}>Risco</th>
+                <th style={{ width: '45%' }}>Observações</th>
               </tr>
             </thead>
             <tbody>
-              {sec.itens.map(({ item, resposta, conforme }) => (
-                <tr key={item.id}>
-                  <td>{item.texto}</td>
-                  <td className={conforme ? 'ri-conforme' : 'ri-nao-conforme'}>
-                    {conforme ? '✓ Conforme' : '✗ Não Conforme'}
-                  </td>
-                  <td>{!conforme ? getRiscoLabel(item.riscoNaoConforme) : '—'}</td>
-                  <td>{resposta?.observacao || '—'}</td>
+              {naoConformidades.sort((a,b) => {
+                  const r: any = { 'Crítico': 4, 'Alto': 3, 'Médio': 2, 'Baixo': 1, 'Nenhum': 0 };
+                  return (r[b.item.riscoNaoConforme] || 0) - (r[a.item.riscoNaoConforme] || 0);
+              }).map(nc => (
+                <tr key={nc.item.id}>
+                  <td><strong>{nc.item.texto}</strong><br/><small>{nc.secao}</small></td>
+                  <td>{getRiscoLabel(nc.item.riscoNaoConforme)}</td>
+                  <td>{nc.resposta?.observacao || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </React.Fragment>
-      ))}
+      ) : <p style={{ fontSize: '10pt', color: '#718096' }}>Nenhuma não conformidade identificada.</p>}
 
-      {/* === 6. NÃO CONFORMIDADES CRÍTICAS === */}
-      {naoConformidades.length > 0 && (
-        <>
-          <h2 className="ri-section-title">6. Não Conformidades Identificadas</h2>
-          <table className="ri-table">
-            <thead>
-              <tr>
-                <th>Área</th>
-                <th>Problema Identificado</th>
-                <th>Grau de Risco</th>
-                <th>Observação / Ação Recomendada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {naoConformidades
-                .sort((a, b) => {
-                  const riskOrder: Record<RiscoNivel, number> = { 'Crítico': 4, 'Alto': 3, 'Médio': 2, 'Baixo': 1, 'Nenhum': 0 };
-                  return (riskOrder[b.item.riscoNaoConforme] || 0) - (riskOrder[a.item.riscoNaoConforme] || 0);
-                })
-                .map(nc => (
-                  <tr key={nc.item.id}>
-                    <td><strong>{nc.secao}</strong></td>
-                    <td>{nc.item.texto}</td>
-                    <td>{getRiscoLabel(nc.item.riscoNaoConforme)}</td>
-                    <td>{nc.resposta?.observacao || '(Nenhuma observação)'}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {/* === 7. REGISTRO FOTOGRÁFICO === */}
+      {/* === REGISTRO FOTOGRÁFICO === */}
       {(() => {
-        const itensComFotos = naoConformidades.filter(nc => nc.resposta?.fotos && nc.resposta.fotos.length > 0);
+        const itensComFotos = Object.entries(data.respostas || {})
+          .map(([id]: [string, any]) => ({ 
+            item: checklist.find(i => i.id === id), 
+            fotos: data.fotosGerais?.[id] || [] 
+          }))
+          .filter(x => x.item && x.fotos.length > 0);
+
         if (itensComFotos.length === 0) return null;
         return (
           <>
-            <h2 className="ri-section-title">7. Registro Fotográfico</h2>
-            <div className="ri-fotos-section">
-              {itensComFotos.map(nc => (
-                <div key={nc.item.id} className="ri-foto-group">
-                  <h4>{nc.secao} — {nc.item.texto}</h4>
-                  <div className="ri-foto-grid">
-                    {nc.resposta!.fotos.map((foto, index) => (
-                      <img key={index} src={foto} alt={`Foto ${index + 1}`} />
-                    ))}
-                  </div>
-                  {nc.resposta?.observacao && (
-                    <p style={{ fontSize: '8pt', fontStyle: 'italic', marginTop: '4px' }}>
-                      <strong>Obs:</strong> {nc.resposta.observacao}
-                    </p>
-                  )}
+            <h2 className="ri-section-title" style={{ pageBreakBefore: 'always' }}>{isCreche ? '11.' : '10.'} Registro Fotográfico</h2>
+            {itensComFotos.map(x => (
+              <div key={x.item!.id} className="ri-foto-group">
+                <h4 style={{ fontSize: '10pt', margin: '0 0 5px 0' }}>{x.item!.secao} — {x.item!.texto}</h4>
+                <div className="ri-foto-grid">
+                  {x.fotos.map((foto: string, i: number) => (
+                    <img key={i} src={foto} alt="Evidência" />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </>
         );
       })()}
 
-      {/* === RODAPÉ / ASSINATURA === */}
       <div className="ri-footer">
         <div className="ri-assinatura">
-          <p style={{ fontWeight: 600, margin: 0 }}>Responsável pela Vistoria</p>
-          <p style={{ fontSize: '9pt', margin: 0 }}>Câmara Municipal de Ubatuba</p>
-          <p style={{ fontSize: '9pt', margin: 0 }}>{dataVistoria}</p>
+          <p style={{ fontWeight: 'bold' }}>Responsável pela Vistoria</p>
+          <p>Câmara Municipal de Ubatuba</p>
+          <p>{dataVistoria}</p>
         </div>
       </div>
     </div>

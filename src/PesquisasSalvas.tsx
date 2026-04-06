@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from './firebaseConfig';
-import { collection, getDocs, Timestamp, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
 
 interface Pesquisa {
   id: string;
@@ -16,7 +15,6 @@ export default function PesquisasSalvas() {
   const [pesquisas, setPesquisas] = useState<Pesquisa[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<'creches' | 'escolas'>('creches');
 
   const fetchPesquisas = async () => {
@@ -59,18 +57,6 @@ export default function PesquisasSalvas() {
     fetchPesquisas();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'diligencias', id));
-      setPesquisas(pesquisas.filter(p => p.id !== id));
-    } catch (err) {
-      console.error("Erro ao excluir pesquisa:", err);
-      setError("Falha ao excluir a pesquisa. Por favor, tente novamente.");
-    } finally {
-      setConfirmingDelete(null);
-    }
-  };
-
   const pesquisasCreches = pesquisas.filter(p => p.tipo === 'Creche');
   const pesquisasEscolas = pesquisas.filter(p => p.tipo === 'Escola');
   const listaAtiva = abaAtiva === 'creches' ? pesquisasCreches : pesquisasEscolas;
@@ -98,32 +84,6 @@ export default function PesquisasSalvas() {
               </div>
               <div className="text-sm text-text-secondary mt-2">Realizada em: {pesquisa.data}</div>
             </Link>
-            <div className="flex items-center space-x-2 self-end md:self-center">
-              {confirmingDelete === pesquisa.id ? (
-                <>
-                  <button
-                    onClick={() => handleDelete(pesquisa.id)}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded transition-colors text-sm whitespace-nowrap"
-                  >
-                    Confirmar Exclusão
-                  </button>
-                  <button
-                    onClick={() => setConfirmingDelete(null)}
-                    className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded transition-colors text-sm"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setConfirmingDelete(pesquisa.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors"
-                  aria-label={`Excluir pesquisa de ${pesquisa.nome}`}
-                >
-                  Excluir
-                </button>
-              )}
-            </div>
           </div>
         ))
       )}
@@ -146,7 +106,7 @@ export default function PesquisasSalvas() {
           {/* Abas Creches / Escolas */}
           <div className="flex justify-center bg-card p-1.5 rounded-xl shadow-sm sticky top-4 z-10">
             <button
-              onClick={() => { setAbaAtiva('creches'); setConfirmingDelete(null); }}
+              onClick={() => { setAbaAtiva('creches'); }}
               className={`w-1/2 py-2.5 text-center font-semibold rounded-lg transition-all duration-300 ${
                 abaAtiva === 'creches'
                   ? 'bg-primary text-white shadow'
@@ -156,7 +116,7 @@ export default function PesquisasSalvas() {
               CRECHES ({pesquisasCreches.length})
             </button>
             <button
-              onClick={() => { setAbaAtiva('escolas'); setConfirmingDelete(null); }}
+              onClick={() => { setAbaAtiva('escolas'); }}
               className={`w-1/2 py-2.5 text-center font-semibold rounded-lg transition-all duration-300 ${
                 abaAtiva === 'escolas'
                   ? 'bg-primary text-white shadow'

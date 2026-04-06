@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { crecheNames } from './escolas';
+import { crecheNames, unidadesEnsino } from './escolas';
 import { checklistCreche, ItemVerificacao } from './diligenciaConfig';
 import CameraComponent from './CameraComponent';
 import { uploadImage } from './firebaseStorage';
@@ -22,8 +23,19 @@ interface FormData {
   alunosFrequentando: number | string;
   evasao: number | string;
   prestacaoContas: string;
+  regiao: string;
+  endereco: string;
+  bairro: string;
+  telefone: string;
   respostas: Record<string, RespostaItem>;
   fotosGerais: Record<string, string[]>;
+  tipificacaoUnidade: string;
+  quadroFuncionalCreche: Record<string, { quantidade: string; vinculo: string; observacao: string }>;
+  observacoesCreche: {
+    gerais: string;
+    adequacoes: string;
+    orientacoesCAE: string;
+  };
 }
 
 // --- Props ---
@@ -90,12 +102,12 @@ const VerificationItem: React.FC<{
             {isNaoConforme && (
                  <div className="mt-3 pt-3 pl-2 border-l-4 border-red-500">
                     <p className="text-xs text-red-400 font-semibold mb-2">Não conformidade detectada (Risco: {item.riscoNaoConforme})</p>
-                    {item.obsObrigatoria && (
+                    {(!disabled || resposta.observacao) && (
                         <textarea
                             value={resposta.observacao}
                             onChange={e => onChange(item.id, { observacao: e.target.value })}
                             className="w-full p-2 border border-gray-600 bg-gray-900 rounded mt-1 text-sm text-white" 
-                            placeholder="* Ação recomendada / Justificativa (obrigatório)"
+                            placeholder="Ação recomendada / Justificativa"
                             rows={2}
                             disabled={disabled}
                         />
@@ -105,7 +117,6 @@ const VerificationItem: React.FC<{
                              {!disabled && (
                                  <>
                                      <button type="button" onClick={() => onOpenCamera(item.id)} className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded disabled:opacity-50 no-print" disabled={disabled}>Anexar Foto</button>
-                                     {item.fotoObrigatoria && <p className="text-xs text-yellow-400 mt-1 inline-block ml-2 no-print">* Anexo de foto é obrigatório.</p>}
                                  </>
                              )}
                              <div className="flex gap-2 mt-2 flex-wrap">
@@ -122,7 +133,50 @@ const VerificationItem: React.FC<{
 
 // --- Componente Principal ---
 export default function QuestionarioCreche({ initialData, isReadOnly = false }: QuestionarioCrecheProps) {
-  const [formData, setFormData] = useState<FormData>({ nomeCreche: '', nomeDiretor: '', totalAlunos: '', alunosFrequentando: '', evasao: '', prestacaoContas: '', respostas: getInitialAnswers(), fotosGerais: {} });
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState<FormData>({ 
+    nomeCreche: '', 
+    nomeDiretor: '', 
+    totalAlunos: '', 
+    alunosFrequentando: '', 
+    evasao: '', 
+    prestacaoContas: '', 
+    tipificacaoUnidade: 'Creche',
+    regiao: '',
+    endereco: '',
+    bairro: '',
+    telefone: '',
+    respostas: getInitialAnswers(), 
+    fotosGerais: {},
+    quadroFuncionalCreche: {
+        berçário: { quantidade: '', vinculo: '', observacao: '' },
+        miniGrupos: { quantidade: '', vinculo: '', observacao: '' },
+        profEfetivos: { quantidade: '', vinculo: '', observacao: '' },
+        merendeiras: { quantidade: '', vinculo: '', observacao: '' },
+        outros: { quantidade: '', vinculo: '', observacao: '' },
+    },
+    observacoesCreche: {
+        gerais: '',
+        adequacoes: '',
+        orientacoesCAE: '',
+    }
+  });
+
+  // Efeito para auto-preencher dados da creche
+  useEffect(() => {
+    if (formData.nomeCreche && !isReadOnly) {
+      const unidade = unidadesEnsino.find(u => u.nome === formData.nomeCreche);
+      if (unidade) {
+        setFormData(prev => ({
+          ...prev,
+          regiao: unidade.regiao,
+          endereco: unidade.endereco,
+          bairro: unidade.bairro,
+          telefone: unidade.telefone
+        }));
+      }
+    }
+  }, [formData.nomeCreche, isReadOnly]);
   const [activeSection, setActiveSection] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -148,14 +202,45 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
         return acc;
       }, {} as Record<string, { titulo: string; subsecoes: Record<string, ItemVerificacao[]> }>);
 
-      const secoesOrdenadas = Object.values(grouped).map(g => ({ titulo: g.titulo, subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) }));
-      return [{ titulo: 'Identificação da Diligência', subsecoes: [] }, ...secoesOrdenadas];
+      const secoesOrdenadas = Object.values(grouped).map(g => ({ 
+        titulo: g.titulo, 
+        type: 'checklist',
+        subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) 
+      }));
+
+      const secoesFinal = [
+        { titulo: '1. Dados de Identificação e Tipificação', type: 'id', subsecoes: [] },
+        { 
+            titulo: '2. Quadro Funcional e Recursos Humanos', 
+            type: 'quadro', 
+            subsecoes: secoesOrdenadas.find(s => s.titulo.includes('2.'))?.subsecoes || [] 
+        },
+        ...(secoesOrdenadas.filter(s => s.titulo.includes('3. Gestão Financeira'))),
+        ...(secoesOrdenadas.filter(s => s.titulo.includes('4. Avaliação Estrutural'))),
+        ...(secoesOrdenadas.filter(s => s.titulo.includes('5. Avaliação da Cozinha'))),
+        ...(secoesOrdenadas.filter(s => s.titulo.includes('6. Áreas Específicas'))),
+        ...(secoesOrdenadas.filter(s => s.titulo.includes('7. Cuidado, Interação'))),
+        { titulo: '8. Observações e Adequações', type: 'observacoes', subsecoes: [] }
+      ];
+
+      return secoesFinal;
   }, []);
 
 
   useEffect(() => {
     if (initialData) {
-      setFormData({ ...initialData, id: initialData.id, respostas: getInitialAnswers(initialData) });
+      setFormData(prev => ({ 
+        ...prev, 
+        ...initialData, 
+        id: initialData.id, 
+        respostas: getInitialAnswers(initialData),
+        quadroFuncionalCreche: initialData.quadroFuncionalCreche || prev.quadroFuncionalCreche,
+        observacoesCreche: initialData.observacoesCreche || prev.observacoesCreche,
+        regiao: initialData.regiao || prev.regiao,
+        endereco: initialData.endereco || prev.endereco,
+        bairro: initialData.bairro || prev.bairro,
+        telefone: initialData.telefone || prev.telefone
+      }));
       setLocalPhotoPreviews({});
       setLocalPhotosData({});
     }
@@ -202,19 +287,21 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
         }
     }
 
-    if (activeSection > 0) {
-        const currentSecoes = secoes[activeSection].subsecoes.flatMap(s => s.itens);
-        for (const item of currentSecoes) {
-            const resposta = formData.respostas[item.id];
-            const isNaoConforme = resposta?.conforme === (item.logicaInvertida ? true : false);
-            if (isNaoConforme && item.obsObrigatoria && !resposta.observacao) {
-                alert(`A observação para o item "${item.texto}" é obrigatória para prosseguir.`);
-                return;
-            }
-            if (isNaoConforme && item.fotoObrigatoria && ((resposta.fotos?.length || 0) + (localPhotosData[item.id]?.length || 0) === 0)) {
-                alert(`Anexar foto para o item "${item.texto}" é obrigatório para prosseguir.`);
-                return;
-            }
+    if (activeSection === 1) {
+        // Validação obrigatória do Quadro Funcional (seção 1 agora)
+        const qf = formData.quadroFuncionalCreche;
+        const camposObrigatorios = [
+            { val: qf.berçário.quantidade, label: 'Quantidade Berçário' },
+            { val: qf.miniGrupos.quantidade, label: 'Quantidade Mini Grupos' },
+            { val: qf.profEfetivos.quantidade, label: 'Professores Efetivos' },
+            { val: qf.merendeiras.quantidade, label: 'Merendeiras' },
+            { val: qf.outros.quantidade, label: 'Outros Funcionários' }
+        ];
+
+        const faltando = camposObrigatorios.filter(c => c.val === '');
+        if (faltando.length > 0) {
+            alert(`Por favor, preencha a quantidade para: ${faltando.map(f => f.label).join(', ')}. Caso não possua, preencha com 0.`);
+            return;
         }
     }
 
@@ -225,15 +312,9 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
 
       if (!currentDocId) {
         const docData = { 
-            nomeCreche: formData.nomeCreche, 
             timestamp: serverTimestamp(), 
             tipificacao: 'Creche',
-            nomeDiretor: formData.nomeDiretor,
-            totalAlunos: formData.totalAlunos,
-            alunosFrequentando: formData.alunosFrequentando,
-            evasao: formData.evasao,
-            prestacaoContas: formData.prestacaoContas,
-            respostas: formData.respostas
+            ...formData
         };
         const docRef = await addDoc(collection(db, 'diligencias'), docData);
         currentDocId = docRef.id;
@@ -260,12 +341,7 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
       }
 
       const finalDataToSave = {
-        nomeCreche: formData.nomeCreche,
-        nomeDiretor: formData.nomeDiretor,
-        totalAlunos: formData.totalAlunos,
-        alunosFrequentando: formData.alunosFrequentando,
-        evasao: formData.evasao,
-        prestacaoContas: formData.prestacaoContas,
+        ...formData,
         respostas: updatedRespostas,
         timestamp: serverTimestamp(),
         tipificacao: 'Creche'
@@ -281,6 +357,7 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
           setActiveSection(activeSection + 1);
       } else {
           alert('Diligência finalizada e salva com sucesso!');
+          navigate('/');
       }
 
     } catch (error) {
@@ -321,15 +398,26 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
         
         <h1 className="text-xl sm:text-2xl font-bold mb-4">{isReadOnly ? `Visualizando: ${formData.nomeCreche}` : '👶 Checklist de Conformidade — Creches'}</h1>
 
-        {secoes.map((sec, secIndex) => (
+        {secoes.map((sec: any, secIndex) => (
             <div key={secIndex} className={isReadOnly || activeSection === secIndex ? 'block mb-8' : 'hidden'}>
-                {secIndex === 0 ? (
-                    <Section title="1. Identificação da Diligência">
+                {sec.type === 'id' && (
+                    <Section title={sec.titulo}>
                         <label className="block mb-2 text-sm font-medium">Nome da Creche *</label>
                         <select name="nomeCreche" value={formData.nomeCreche} onChange={e => handleFieldChange('nomeCreche', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly || !!initialData}>
                             <option value="">Selecione uma creche</option>
                             {crecheNames.map(name => <option key={name} value={name}>{name}</option>)}
                         </select>
+
+                        <div className="mt-4">
+                            <label className="block mb-2 text-sm font-medium">Tipificação *</label>
+                            <div className="flex gap-4 items-center text-sm">
+                                {['Creche', 'Pré-Escola'].map(t => (
+                                    <label key={t} className="flex items-center gap-2">
+                                        <input type="radio" value={t} checked={formData.tipificacaoUnidade === t} onChange={e => handleFieldChange('tipificacaoUnidade', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> {t}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
 
                         <label className="block mt-4 mb-2 text-sm font-medium">Nome do(a) Diretor(a) *</label>
                         <input type="text" value={formData.nomeDiretor} onChange={e => handleFieldChange('nomeDiretor', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
@@ -355,16 +443,109 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
                             <label className="flex items-center gap-2"><input type="radio" value="Trimestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Trimestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Trimestral</label>
                             <label className="flex items-center gap-2"><input type="radio" value="Semestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Semestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Semestral</label>
                         </div>
+
+                        {/* Campos auto-preenchidos */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold">Região</p>
+                                <p className="text-sm">{formData.regiao || '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold">Telefone</p>
+                                <p className="text-sm">{formData.telefone || '—'}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Endereço</p>
+                                <p className="text-sm">{formData.endereco ? `${formData.endereco} - ${formData.bairro}` : '—'}</p>
+                            </div>
+                        </div>
                     </Section>
-                ) : (
-                     <Section title={`${secIndex + 1}. ${sec.titulo}`}>
-                        {sec.subsecoes.map(sub => (
+                )}
+
+                {sec.type === 'checklist' && (
+                     <Section title={sec.titulo}>
+                        {sec.subsecoes.map((sub: any) => (
                             <SubSection key={sub.titulo} title={sub.titulo}>
-                                {sub.itens.map(item => (
+                                {sub.itens.map((item: any) => (
                                     <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
                                 ))}
                             </SubSection>
                         ))}
+                    </Section>
+                )}
+
+                {sec.type === 'quadro' && (
+                    <Section title={sec.titulo}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-700">
+                                        <th className="py-2 px-1">Função / Categoria</th>
+                                        <th className="py-2 px-1 w-24 text-center">Quantidade</th>
+                                        <th className="py-2 px-1">Vínculo Empregatício</th>
+                                        <th className="py-2 px-1">Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { id: 'berçário', label: 'Agentes Educacionais/Cuidadores (Berçário)' },
+                                        { id: 'miniGrupos', label: 'Agentes Educacionais/Cuidadores (Mini-Grupos)' },
+                                        { id: 'profEfetivos', label: 'Professores Efetivos' },
+                                        { id: 'merendeiras', label: 'Merendeiras' },
+                                        { id: 'outros', label: 'Outros Funcionários' },
+                                    ].map(row => (
+                                        <tr key={row.id} className="border-b border-gray-800 last:border-0">
+                                            <td className="py-2 px-1">{row.label}</td>
+                                            <td className="py-2 px-1 text-center">
+                                                <input type="text" value={formData.quadroFuncionalCreche[row.id].quantidade} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], quantidade: e.target.value } } }))} className="w-16 p-1 bg-gray-800 border border-gray-700 rounded text-center" disabled={isReadOnly} />
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <select value={formData.quadroFuncionalCreche[row.id].vinculo} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], vinculo: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}>
+                                                    <option value="">Selecione...</option>
+                                                    <option value="Contrato">Contrato</option>
+                                                    <option value="Concurso">Concurso</option>
+                                                </select>
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <input type="text" value={formData.quadroFuncionalCreche[row.id].observacao} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], observacao: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" placeholder="..." disabled={isReadOnly} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Checklist items for this section (e.g. Specialists Room) */}
+                        {sec.subsecoes.length > 0 && (
+                            <div className="mt-8 pt-4 border-t border-gray-700">
+                                {sec.subsecoes.map((sub: any) => (
+                                    <SubSection key={sub.titulo} title={sub.titulo}>
+                                        {sub.itens.map((item: any) => (
+                                            <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
+                                        ))}
+                                    </SubSection>
+                                ))}
+                            </div>
+                        )}
+                    </Section>
+                )}
+
+                {sec.type === 'observacoes' && (
+                    <Section title={sec.titulo}>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block mb-1 text-sm font-medium font-bold text-blue-400">Observações Gerais sobre a Creche:</label>
+                                <textarea value={formData.observacoesCreche.gerais} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, gerais: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-sm font-medium font-bold text-red-400">Adequações Prioritárias:</label>
+                                <textarea value={formData.observacoesCreche.adequacoes} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, adequacoes: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-sm font-medium font-bold text-yellow-400">Orientação do CAE/Responsável:</label>
+                                <textarea value={formData.observacoesCreche.orientacoesCAE} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, orientacoesCAE: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
+                            </div>
+                        </div>
                     </Section>
                 )}
 

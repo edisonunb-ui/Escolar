@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { schoolNames } from './escolas';
+import { schoolNames, unidadesEnsino } from './escolas';
 import { checklistEscola, ItemVerificacao } from './diligenciaConfig';
 import CameraComponent from './CameraComponent';
 import { uploadImage } from './firebaseStorage';
@@ -22,8 +23,18 @@ interface FormData {
   alunosFrequentando: number | string;
   evasao: number | string;
   prestacaoContas: string;
+  tipificacaoUnidade: string; // Creche, Etapa, Fundamental
+  regiao: string;
+  endereco: string;
+  bairro: string;
+  telefone: string;
   respostas: Record<string, RespostaItem>;
   fotosGerais: Record<string, string[]>;
+  quadroFuncional: Record<string, { quantidade: string; vinculo: string; observacao: string }>;
+  equipeTecnica: Record<string, { quantidade: string; vinculo: string; observacao: string }>;
+  perguntasDescritivas: Record<string, string>;
+  avaliacaoAluno: Record<string, string>;
+  adequacoesPNAE: string;
 }
 
 // --- Props ---
@@ -123,7 +134,67 @@ const VerificationItem: React.FC<{
 
 // --- Componente Principal ---
 export default function QuestionarioEscolar({ initialData, isReadOnly = false }: QuestionarioEscolarProps) {
-  const [formData, setFormData] = useState<FormData>({ nomeEscola: '', nomeDiretor: '', totalAlunos: '', alunosFrequentando: '', evasao: '', prestacaoContas: '', respostas: getInitialAnswers(), fotosGerais: {} });
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState<FormData>({ 
+    nomeEscola: '', 
+    nomeDiretor: '', 
+    totalAlunos: '', 
+    alunosFrequentando: '', 
+    evasao: '', 
+    prestacaoContas: '', 
+    tipificacaoUnidade: '',
+    regiao: '',
+    endereco: '',
+    bairro: '',
+    telefone: '',
+    respostas: getInitialAnswers(), 
+    fotosGerais: {},
+    quadroFuncional: {
+        agentes: { quantidade: '', vinculo: '', observacao: '' },
+        profEfetivos: { quantidade: '', vinculo: '', observacao: '' },
+        profEventuais: { quantidade: '', vinculo: '', observacao: '' },
+        merendeirasMat: { quantidade: '', vinculo: '', observacao: '' },
+        merendeirasVesp: { quantidade: '', vinculo: '', observacao: '' },
+        merendeirasNot: { quantidade: '', vinculo: '', observacao: '' },
+        outros: { quantidade: '', vinculo: '', observacao: '' },
+    },
+    equipeTecnica: {
+        assistenteSocial: { quantidade: '', vinculo: '', observacao: '' },
+        psicologo: { quantidade: '', vinculo: '', observacao: '' },
+        psicopedagogo: { quantidade: '', vinculo: '', observacao: '' },
+        fonoaudiologo: { quantidade: '', vinculo: '', observacao: '' },
+    },
+    perguntasDescritivas: {
+        freqAssisPsico: '',
+        freqPsicoFono: '',
+        registroAtendimentos: '',
+        integracaoRelatorios: '',
+    },
+    avaliacaoAluno: {
+        gostaMais: '',
+        gostariaDiferente: '',
+        seSenteSeguro: '',
+        opiniaoMerenda: '',
+        limpezaBanheiros: '',
+    },
+    adequacoesPNAE: '',
+  });
+
+  // Efeito para auto-preencher dados da escola
+  useEffect(() => {
+    if (formData.nomeEscola && !isReadOnly) {
+      const unidade = unidadesEnsino.find(u => u.nome === formData.nomeEscola);
+      if (unidade) {
+        setFormData(prev => ({
+          ...prev,
+          regiao: unidade.regiao,
+          endereco: unidade.endereco,
+          bairro: unidade.bairro,
+          telefone: unidade.telefone
+        }));
+      }
+    }
+  }, [formData.nomeEscola, isReadOnly]);
   const [activeSection, setActiveSection] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -149,13 +220,47 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
         return acc;
       }, {} as Record<string, { titulo: string; subsecoes: Record<string, ItemVerificacao[]> }>);
 
-      const secoesOrdenadas = Object.values(grouped).map(g => ({ titulo: g.titulo, subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) }));
-      return [{ titulo: 'Identificação da Diligência', subsecoes: [] }, ...secoesOrdenadas];
+      const secoesOrdenadas = Object.values(grouped).map(g => ({ 
+        titulo: g.titulo, 
+        type: 'checklist',
+        subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) 
+      }));
+
+      const secoesFinal = [
+        { titulo: '1. Dados de Identificação e Tipificação', type: 'id', subsecoes: [] },
+        { 
+          titulo: '2. Quadro Funcional e Recursos Humanos', 
+          type: 'quadro', 
+          subsecoes: secoesOrdenadas.find(s => s.titulo === '2. Quadro Funcional e Recursos Humanos')?.subsecoes || [] 
+        },
+        ...(secoesOrdenadas.filter(s => s.titulo === '3. Gestão Financeira e APM/CAE')),
+        ...(secoesOrdenadas.filter(s => s.titulo === '4. Avaliação Estrutural')),
+        ...(secoesOrdenadas.filter(s => s.titulo === '5. Avaliação da Cozinha e Refeitório')),
+        { titulo: '6. Perguntas Descritivas (Atuação e Registro)', type: 'descritivas', subsecoes: [] },
+        ...(secoesOrdenadas.filter(s => s.titulo === '7. Áreas Específicas e Infraestrutura')),
+      ];
+
+      return secoesFinal;
   }, []);
 
   useEffect(() => {
     if (initialData) {
-      setFormData({ ...initialData, id: initialData.id, respostas: getInitialAnswers(initialData) });
+      setFormData(prev => ({ 
+        ...prev, 
+        ...initialData, 
+        id: initialData.id, 
+        respostas: getInitialAnswers(initialData),
+        quadroFuncional: initialData.quadroFuncional || prev.quadroFuncional,
+        equipeTecnica: initialData.equipeTecnica || prev.equipeTecnica,
+        perguntasDescritivas: initialData.perguntasDescritivas || prev.perguntasDescritivas,
+        avaliacaoAluno: initialData.avaliacaoAluno || prev.avaliacaoAluno,
+        adequacoesPNAE: initialData.adequacoesPNAE || prev.adequacoesPNAE,
+        tipificacaoUnidade: initialData.tipificacaoUnidade || prev.tipificacaoUnidade,
+        regiao: initialData.regiao || prev.regiao,
+        endereco: initialData.endereco || prev.endereco,
+        bairro: initialData.bairro || prev.bairro,
+        telefone: initialData.telefone || prev.telefone
+      }));
       setLocalPhotoPreviews({});
       setLocalPhotosData({});
     }
@@ -202,6 +307,26 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
         }
     }
 
+    if (activeSection === 1) {
+        // Validação obrigatória do Quadro Funcional (seção 1 agora)
+        const qf = formData.quadroFuncional;
+        const camposObrigatorios = [
+            { val: qf.agentes.quantidade, label: 'Agentes de Organização' },
+            { val: qf.profEfetivos.quantidade, label: 'Professores Efetivos' },
+            { val: qf.profEventuais.quantidade, label: 'Professores Eventuais' },
+            { val: qf.merendeirasMat.quantidade, label: 'Merendeiras (Manhã)' },
+            { val: qf.merendeirasVesp.quantidade, label: 'Merendeiras (Tarde)' },
+            { val: qf.merendeirasNot.quantidade, label: 'Merendeiras (Noite)' },
+            { val: qf.outros.quantidade, label: 'Outros Funcionários' }
+        ];
+
+        const faltando = camposObrigatorios.filter(c => c.val === '');
+        if (faltando.length > 0) {
+            alert(`Por favor, preencha a quantidade para: ${faltando.map(f => f.label).join(', ')}. Caso não possua, preencha com 0.`);
+            return;
+        }
+    }
+
      if (activeSection > 0) {
         const currentSecoes = secoes[activeSection].subsecoes.flatMap(s => s.itens);
         for (const item of currentSecoes) {
@@ -233,6 +358,10 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
             alunosFrequentando: formData.alunosFrequentando,
             evasao: formData.evasao,
             prestacaoContas: formData.prestacaoContas,
+            regiao: formData.regiao,
+            endereco: formData.endereco,
+            bairro: formData.bairro,
+            telefone: formData.telefone,
             respostas: formData.respostas
         };
         const docRef = await addDoc(collection(db, 'diligencias'), docData);
@@ -260,12 +389,7 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
       }
 
       const finalDataToSave = {
-        nomeEscola: formData.nomeEscola,
-        nomeDiretor: formData.nomeDiretor,
-        totalAlunos: formData.totalAlunos,
-        alunosFrequentando: formData.alunosFrequentando,
-        evasao: formData.evasao,
-        prestacaoContas: formData.prestacaoContas,
+        ...formData,
         respostas: updatedRespostas,
         timestamp: serverTimestamp(),
         tipificacao: 'Escola'
@@ -281,6 +405,7 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
           setActiveSection(activeSection + 1);
       } else {
           alert('Diligência finalizada e salva com sucesso!');
+          navigate('/');
       }
 
     } catch (error) {
@@ -321,15 +446,26 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
         
         <h1 className="text-xl sm:text-2xl font-bold mb-4">{isReadOnly ? `Visualizando: ${formData.nomeEscola}` : '🏫 Checklist de Conformidade — Escolas'}</h1>
 
-        {secoes.map((sec, secIndex) => (
+        {secoes.map((sec: any, secIndex) => (
             <div key={secIndex} className={isReadOnly || activeSection === secIndex ? 'block mb-8' : 'hidden'}>
-                {secIndex === 0 ? (
-                    <Section title="1. Identificação da Diligência">
+                {sec.type === 'id' && (
+                    <Section title={sec.titulo}>
                         <label className="block mb-2 text-sm font-medium">Nome da Escola *</label>
                         <select name="nomeEscola" value={formData.nomeEscola} onChange={e => handleFieldChange('nomeEscola', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly || !!initialData}>
                             <option value="">Selecione uma escola</option>
                             {schoolNames.map(name => <option key={name} value={name}>{name}</option>)}
                         </select>
+
+                        <div className="mt-4">
+                            <label className="block mb-2 text-sm font-medium">Tipificação *</label>
+                            <div className="flex gap-4 items-center text-sm">
+                                {['Creche', 'Etapa', 'Fundamental'].map(t => (
+                                    <label key={t} className="flex items-center gap-2">
+                                        <input type="radio" value={t} checked={formData.tipificacaoUnidade === t} onChange={e => handleFieldChange('tipificacaoUnidade', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> {t}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
 
                         <label className="block mt-4 mb-2 text-sm font-medium">Nome do(a) Diretor(a) *</label>
                         <input type="text" value={formData.nomeDiretor} onChange={e => handleFieldChange('nomeDiretor', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
@@ -348,25 +484,162 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
                                 <input type="number" value={formData.evasao} onChange={e => handleFieldChange('evasao', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
                             </div>
                         </div>
-                        
                         <label className="block mt-4 mb-2 text-sm font-medium">Periodicidade da Prestação de Contas *</label>
                         <div className="flex gap-4 items-center text-sm">
                             <label className="flex items-center gap-2"><input type="radio" value="Mensal" name="prestacaoContas" checked={formData.prestacaoContas === 'Mensal'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Mensal</label>
                             <label className="flex items-center gap-2"><input type="radio" value="Trimestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Trimestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Trimestral</label>
                             <label className="flex items-center gap-2"><input type="radio" value="Semestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Semestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Semestral</label>
                         </div>
+
+                        {/* Campos auto-preenchidos */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold">Região</p>
+                                <p className="text-sm">{formData.regiao || '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold">Telefone</p>
+                                <p className="text-sm">{formData.telefone || '—'}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Endereço</p>
+                                <p className="text-sm">{formData.endereco ? `${formData.endereco} - ${formData.bairro}` : '—'}</p>
+                            </div>
+                        </div>
                     </Section>
-                ) : (
-                     <Section title={`${secIndex + 1}. ${sec.titulo}`}>
-                        {sec.subsecoes.map(sub => (
+                )}
+
+                {sec.type === 'checklist' && (
+                     <Section title={sec.titulo}>
+                        {sec.subsecoes.map((sub: any) => (
                             <SubSection key={sub.titulo} title={sub.titulo}>
-                                {sub.itens.map(item => (
+                                {sub.itens.map((item: any) => (
                                     <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
                                 ))}
                             </SubSection>
                         ))}
                     </Section>
                 )}
+
+                {sec.type === 'quadro' && (
+                    <Section title={sec.titulo}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-700">
+                                        <th className="py-2 px-1">Função / Vínculo</th>
+                                        <th className="py-2 px-1 w-24 text-center">Quantidade</th>
+                                        <th className="py-2 px-1">Vínculo Empregatício</th>
+                                        <th className="py-2 px-1">Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { id: 'agentes', label: 'Agentes Educacionais' },
+                                        { id: 'profEfetivos', label: 'Professores Efetivos' },
+                                        { id: 'profEventuais', label: 'Professores Eventuais/Substitutos' },
+                                        { id: 'merendeirasMat', label: 'Merendeiras - Matutino' },
+                                        { id: 'merendeirasVesp', label: 'Merendeiras - Vespertino' },
+                                        { id: 'merendeirasNot', label: 'Merendeiras - Noturno' },
+                                        { id: 'outros', label: 'Outros Funcionários (Limpeza, Segurança, etc.)' },
+                                    ].map(row => (
+                                        <tr key={row.id} className="border-b border-gray-800 last:border-0">
+                                            <td className="py-2 px-1">{row.label}</td>
+                                            <td className="py-2 px-1 text-center">
+                                                <input type="text" value={formData.quadroFuncional[row.id].quantidade} onChange={e => setFormData(prev => ({ ...prev, quadroFuncional: { ...prev.quadroFuncional, [row.id]: { ...prev.quadroFuncional[row.id], quantidade: e.target.value } } }))} className="w-16 p-1 bg-gray-800 border border-gray-700 rounded text-center" disabled={isReadOnly} />
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <select value={formData.quadroFuncional[row.id].vinculo} onChange={e => setFormData(prev => ({ ...prev, quadroFuncional: { ...prev.quadroFuncional, [row.id]: { ...prev.quadroFuncional[row.id], vinculo: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}>
+                                                    <option value="">Selecione...</option>
+                                                    <option value="Contrato">Contrato</option>
+                                                    <option value="Concurso">Concurso</option>
+                                                </select>
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <input type="text" value={formData.quadroFuncional[row.id].observacao} onChange={e => setFormData(prev => ({ ...prev, quadroFuncional: { ...prev.quadroFuncional, [row.id]: { ...prev.quadroFuncional[row.id], observacao: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" placeholder="..." disabled={isReadOnly} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="mt-8 overflow-x-auto">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-700">
+                                        <th className="py-2 px-1">Função / Especialista</th>
+                                        <th className="py-2 px-1 w-24 text-center">Quantidade</th>
+                                        <th className="py-2 px-1">Vínculo Empregatício</th>
+                                        <th className="py-2 px-1">Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { id: 'assistenteSocial', label: 'Assistente Social' },
+                                        { id: 'psicologo', label: 'Psicólogo' },
+                                        { id: 'psicopedagogo', label: 'Psicopedagogo' },
+                                        { id: 'fonoaudiologo', label: 'Fonoaudiólogo' },
+                                    ].map(row => (
+                                        <tr key={row.id} className="border-b border-gray-800 last:border-0">
+                                            <td className="py-2 px-1">{row.label}</td>
+                                            <td className="py-2 px-1 text-center">
+                                                <input type="text" value={formData.equipeTecnica[row.id].quantidade} onChange={e => setFormData(prev => ({ ...prev, equipeTecnica: { ...prev.equipeTecnica, [row.id]: { ...prev.equipeTecnica[row.id], quantidade: e.target.value } } }))} className="w-16 p-1 bg-gray-800 border border-gray-700 rounded text-center" disabled={isReadOnly} />
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <select value={formData.equipeTecnica[row.id].vinculo} onChange={e => setFormData(prev => ({ ...prev, equipeTecnica: { ...prev.equipeTecnica, [row.id]: { ...prev.equipeTecnica[row.id], vinculo: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}>
+                                                    <option value="">Selecione...</option>
+                                                    <option value="Contratado">Contratado</option>
+                                                    <option value="Concursado">Concursado</option>
+                                                </select>
+                                            </td>
+                                            <td className="py-2 px-1">
+                                                <input type="text" value={formData.equipeTecnica[row.id].observacao} onChange={e => setFormData(prev => ({ ...prev, equipeTecnica: { ...prev.equipeTecnica, [row.id]: { ...prev.equipeTecnica[row.id], observacao: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" placeholder="..." disabled={isReadOnly} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Checklist items for this section (e.g. Specialists Room) */}
+                        {sec.subsecoes.length > 0 && (
+                            <div className="mt-8 pt-4 border-t border-gray-700">
+                                {sec.subsecoes.map((sub: any) => (
+                                    <SubSection key={sub.titulo} title={sub.titulo}>
+                                        {sub.itens.map((item: any) => (
+                                            <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
+                                        ))}
+                                    </SubSection>
+                                ))}
+                            </div>
+                        )}
+                    </Section>
+                )}
+
+                {sec.type === 'descritivas' && (
+                    <Section title={sec.titulo}>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block mb-1 text-sm font-medium">Frequência de Atuação: Qual a frequência (dias/horas por semana) de atuação do Assistente Social e do Psicólogo na escola?</label>
+                                <textarea value={formData.perguntasDescritivas.freqAssisPsico} onChange={e => setFormData(prev => ({ ...prev, perguntasDescritivas: { ...prev.perguntasDescritivas, freqAssisPsico: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={2} disabled={isReadOnly} />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-sm font-medium">Frequência de Atuação: Caso a escola receba Psicopedagogo e/ou Fonoaudiólogo, qual a frequência desses profissionais e qual o critério de encaminhamento dos alunos?</label>
+                                <textarea value={formData.perguntasDescritivas.freqPsicoFono} onChange={e => setFormData(prev => ({ ...prev, perguntasDescritivas: { ...prev.perguntasDescritivas, freqPsicoFono: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={2} disabled={isReadOnly} />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-sm font-medium">Registro de Atendimentos: A escola mantém um registro individualizado (prontuário ou relatório) dos atendimentos realizados por estes profissionais?</label>
+                                <textarea value={formData.perguntasDescritivas.registroAtendimentos} onChange={e => setFormData(prev => ({ ...prev, perguntasDescritivas: { ...prev.perguntasDescritivas, registroAtendimentos: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={2} disabled={isReadOnly} />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-sm font-medium">Integração: Os relatórios dos atendimentos são compartilhados com os professores e a coordenação pedagógica?</label>
+                                <textarea value={formData.perguntasDescritivas.integracaoRelatorios} onChange={e => setFormData(prev => ({ ...prev, perguntasDescritivas: { ...prev.perguntasDescritivas, integracaoRelatorios: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={2} disabled={isReadOnly} />
+                            </div>
+                        </div>
+                    </Section>
+                )}
+
 
                 {!isReadOnly && (
                     <div className="flex justify-between mt-4">

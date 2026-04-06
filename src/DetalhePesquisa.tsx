@@ -16,6 +16,7 @@ export default function DetalhePesquisa() {
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [viewMode, setViewMode] = useState<'quest' | 'report'>('quest');
 
   useEffect(() => {
     setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
@@ -103,7 +104,23 @@ export default function DetalhePesquisa() {
 
       {pesquisa && (
         <div>
-          <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center mb-4 no-print gap-2">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center mb-6 no-print gap-4 pb-4 border-b border-gray-700">
+            {/* Seletor de Visualização */}
+            <div className="flex bg-gray-800 p-1 rounded-xl self-start">
+                <button 
+                  onClick={() => setViewMode('quest')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${viewMode === 'quest' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  📋 Questionário
+                </button>
+                <button 
+                  onClick={() => setViewMode('report')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${viewMode === 'report' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  📑 Relatório Técnico
+                </button>
+            </div>
+
             {confirmingDelete ? (
               <div className="flex gap-2 justify-end">
                 <button 
@@ -123,36 +140,38 @@ export default function DetalhePesquisa() {
               <div className="flex flex-col sm:flex-row gap-2 justify-end">
                 <button 
                   onClick={() => setConfirmingDelete(true)}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg shadow font-semibold hover:bg-red-700 transition w-full sm:w-auto"
+                  className="px-6 py-2 bg-red-600/20 text-red-400 border border-red-900/50 rounded-lg shadow font-semibold hover:bg-red-900/30 transition w-full sm:w-auto"
                 >
                   Excluir
                 </button>
-                {isMobile ? (
-                  <p className="text-sm text-center text-text-secondary p-3 bg-card rounded-lg border border-gray-700">
-                    <b>Dica:</b> Para salvar em PDF, use a opção "Compartilhar" e "Imprimir" do seu navegador.
-                  </p>
-                ) : (
-                  <button 
-                    onClick={handlePrint} 
-                    className="px-6 py-2 bg-gray-700 text-white rounded-lg shadow font-semibold hover:bg-gray-600 transition w-full sm:w-auto"
-                  >
-                    Imprimir / Salvar PDF
-                  </button>
-                )}
+                <button 
+                  onClick={handlePrint} 
+                  className="px-6 py-2 bg-gray-700 text-white rounded-lg shadow font-semibold hover:bg-gray-600 transition w-full sm:w-auto"
+                >
+                  {isMobile ? 'Imprimir PDF' : 'Imprimir / Salvar PDF'}
+                </button>
               </div>
             )}
           </div>
 
-          <div className="screen-only">
-            {tipoPesquisa === 'Creche' && 
-              <QuestionarioCreche initialData={pesquisa} isReadOnly={true} />}
-            
-            {tipoPesquisa === 'Escola' && 
-              <QuestionarioEscolar initialData={pesquisa} isReadOnly={true} />}
-          </div>
+          {viewMode === 'quest' ? (
+            <div className="screen-only">
+              {tipoPesquisa === 'Creche' && 
+                <QuestionarioCreche initialData={pesquisa} isReadOnly={true} />}
+              
+              {tipoPesquisa === 'Escola' && 
+                <QuestionarioEscolar initialData={pesquisa} isReadOnly={true} />}
+            </div>
+          ) : (
+            <div className="bg-gray-800 p-2 sm:p-8 rounded-2xl overflow-hidden border border-gray-700">
+                <RelatorioImpressao data={pesquisa} />
+            </div>
+          )}
 
-          {/* Relatório profissional visível apenas na impressão */}
-          <RelatorioImpressao data={pesquisa} />
+          {/* Relatório profissional invisível na tela mas ativo para a impressão do SO */}
+          <div className="hidden">
+              <RelatorioImpressao data={pesquisa} />
+          </div>
         </div>
       )}
     </div>
