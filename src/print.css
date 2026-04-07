@@ -1,26 +1,46 @@
 
 /* Oculta os botões de navegação e outros elementos da interface ao imprimir */
 @media print {
+  /* Reset global de cores para garantir fundo branco e texto preto na impressão */
+  html, body, #root, main {
+    background-color: white !important;
+    background-image: none !important;
+    color: black !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Garante que todos os contêineres pais permitam a quebra de página */
+  * {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
   .no-print {
     display: none !important;
   }
 
-  /* Garante que todas as seções do formulário sejam visíveis */
-  .printable-section {
+  .print-only {
     display: block !important;
-    page-break-inside: avoid; /* Tenta evitar que uma seção seja cortada entre duas páginas */
+    visibility: visible !important;
   }
 
-  /* Garante que o contêiner principal se expanda para mostrar todo o conteúdo */
-  .printable-container {
-    display: block !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* Estilos gerais para melhorar a legibilidade da impressão */
+  /* Força a cor dos fundos e textos durante a impressão */
   body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* Remove sombras e bordas coloridas que podem distrair */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* Estilo para elementos que só aparecem na impressão (padrão escondido na tela) */
+.print-only {
+  display: none;
 }

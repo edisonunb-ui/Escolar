@@ -72,27 +72,7 @@ export default function DetalhePesquisa() {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto bg-background rounded-lg shadow">
-       <style>
-        {`
-          @media print {
-            body {
-              background-color: #fff !important;
-              color: #000 !important;
-            }
-            nav, .no-print, header {
-              display: none !important;
-            }
-            main {
-              padding: 0 !important;
-              margin: 0 !important;
-            }
-            /* Esconder a visualização do questionário na impressão */
-            .screen-only {
-              display: none !important;
-            }
-          }
-        `}
-       </style>
+        {/* Estilos de impressão agora centralizados no print.css */}
 
       {loading && <p className="text-center text-text-secondary no-print">Carregando dados...</p>}
       {error && (
@@ -155,7 +135,7 @@ export default function DetalhePesquisa() {
           </div>
 
           {viewMode === 'quest' ? (
-            <div className="screen-only">
+            <div className="no-print">
               {tipoPesquisa === 'Creche' && 
                 <QuestionarioCreche initialData={pesquisa} isReadOnly={true} />}
               
@@ -163,13 +143,13 @@ export default function DetalhePesquisa() {
                 <QuestionarioEscolar initialData={pesquisa} isReadOnly={true} />}
             </div>
           ) : (
-            <div className="bg-gray-800 p-2 sm:p-8 rounded-2xl overflow-hidden border border-gray-700">
+            <div className="bg-gray-800 p-2 sm:p-8 rounded-2xl overflow-hidden border border-gray-700 no-print">
                 <RelatorioImpressao data={pesquisa} />
             </div>
           )}
 
-          {/* Relatório profissional invisível na tela mas ativo para a impressão do SO */}
-          <div className="hidden">
+          {/* Relatório profissional ativado APENAS para a impressão do SO */}
+          <div className="print-only">
               <RelatorioImpressao data={pesquisa} />
           </div>
         </div>

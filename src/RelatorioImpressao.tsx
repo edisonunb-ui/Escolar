@@ -115,31 +115,42 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
           margin: 0 auto;
         }
         @media print {
-          .relatorio-impressao { display: block !important; padding: 20mm; background: white; box-shadow: none; border-radius: 0; max-width: none; margin: 0; }
+          .relatorio-impressao { 
+            display: block !important; 
+            padding: 10mm 15mm !important; 
+            background: white !important; 
+            color: black !important;
+            box-shadow: none !important; 
+            border-radius: 0 !important; 
+            max-width: none !important; 
+            margin: 0 !important; 
+          }
           .no-print { display: none !important; }
-          body { background: white !important; }
+          /* Garante que o fundo branco seja forçado */
+          * { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important; }
         }
-        .ri-header { display: flex; align-items: center; border-bottom: 2px solid #2d3748; padding-bottom: 15px; margin-bottom: 20px; }
+        .ri-header { display: flex; align-items: center; border-bottom: 2px solid #2d3748; padding-bottom: 15px; margin-bottom: 20px; page-break-after: avoid; }
         .ri-header img { height: 60px; margin-right: 20px; }
         .ri-header-text h1 { font-size: 18pt; margin: 0; color: #2d3748; }
         .ri-header-text p { font-size: 10pt; margin: 0; color: #718096; }
-        .ri-section-title { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #cbd5e0; margin-top: 25px; margin-bottom: 10px; color: #2b6cb0; page-break-after: avoid; }
+        .ri-section-title { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #cbd5e0; margin-top: 25px; margin-bottom: 10px; color: #2b6cb0; page-break-after: avoid; break-after: avoid; }
         .ri-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .ri-info-item { font-size: 10pt; }
         .ri-info-label { font-weight: bold; color: #4a5568; margin-right: 5px; }
-        .ri-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9pt; }
+        .ri-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9pt; page-break-inside: auto; }
+        .ri-table tr { page-break-inside: avoid; page-break-after: auto; }
         .ri-table th, .ri-table td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
-        .ri-table th { background-color: #f7fafc; color: #4a5568; font-weight: bold; text-transform: uppercase; font-size: 8pt; }
-        .ri-conforme { color: #38a169; font-weight: bold; }
-        .ri-nao-conforme { color: #e53e3e; font-weight: bold; }
-        .ri-resumo-box { border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .ri-table th { background-color: #f7fafc !important; color: #4a5568; font-weight: bold; text-transform: uppercase; font-size: 8pt; }
+        .ri-conforme { color: #2f855a !important; font-weight: bold; }
+        .ri-nao-conforme { color: #c53030 !important; font-weight: bold; }
+        .ri-resumo-box { border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; page-break-inside: avoid; }
         .ri-resumo-grid { display: flex; justify-content: space-around; text-align: center; }
         .ri-big-number { font-size: 20pt; font-weight: bold; color: #2d3748; }
         .ri-label { font-size: 8pt; color: #718096; text-transform: uppercase; }
         .ri-foto-group { margin-bottom: 20px; page-break-inside: avoid; }
         .ri-foto-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .ri-foto-grid img { width: 48%; border-radius: 4px; border: 1px solid #e2e8f0; }
-        .ri-footer { margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        .ri-foto-grid img { width: 45%; max-height: 250px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .ri-footer { margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; page-break-inside: avoid; }
         .ri-assinatura { border-top: 1px solid #2d3748; display: inline-block; padding-top: 10px; min-width: 300px; margin-top: 40px; }
       `}</style>
       
