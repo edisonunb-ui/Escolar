@@ -246,7 +246,7 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
             .print-only { display: none; }
         `}</style>
         
-        <div className="print-only ri-header pt-4">
+        <div className="hidden print:flex ri-header pt-4">
             <img src={logo} alt="Logo" />
             <div className="ri-header-text">
                 <h1>Relatório de Diligência Técnica</h1>

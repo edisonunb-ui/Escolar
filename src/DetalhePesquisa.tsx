@@ -149,7 +149,7 @@ export default function DetalhePesquisa() {
           )}
 
           {/* Relatório profissional ativado APENAS para a impressão do SO */}
-          <div className="print-only">
+          <div className="hidden print:block">
               <RelatorioImpressao data={pesquisa} />
           </div>
         </div>
