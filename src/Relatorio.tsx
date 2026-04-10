@@ -1,6 +1,7 @@
-
 import React, { useMemo } from 'react';
 import { checklistCreche, checklistEscola, ItemVerificacao, RiscoNivel } from './diligenciaConfig';
+import logo from '/logo-camara.png';
+import { useAuth } from './AuthContext';
 
 // --- TIPOS E INTERFACES ---
 interface RelatorioProps {
@@ -80,6 +81,7 @@ const ResumoItem: React.FC<{ label: string, value: React.ReactNode, valueClassNa
 // --- COMPONENTE PRINCIPAL ---
 
 export default function Relatorio({ data }: RelatorioProps) {
+  const { user } = useAuth();
 
   const analise = useMemo(() => {
     if (!data || !data.respostas) return null;
@@ -172,21 +174,47 @@ export default function Relatorio({ data }: RelatorioProps) {
   const { conformidadeGeral, riscoGeral, statusGeral, principaisProblemas, naoConformidadesOrdenadas, secoes } = analise;
 
   return (
-    <div className="p-4 sm:p-8 bg-white text-gray-800 font-sans print:p-2">
-      <div className="max-w-4xl mx-auto">
-
-        <header className="text-center mb-10 border-b-4 border-gray-800 pb-4">
-            <h1 className="text-3xl font-bold uppercase print:text-2xl">Relatório de Diligência Técnica</h1>
-            <p className="text-lg text-gray-600 print:text-base">{analise.data.nomeCreche || analise.data.nomeEscola}</p>
-        </header>
+    <div className="p-4 sm:p-8 bg-white text-gray-800 font-sans print:p-0">
+      <style>{`
+        @media print {
+          .print-table { width: 100%; border: none !important; }
+          .print-table thead { display: table-header-group; }
+          * { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important; }
+          body { background: white !important; }
+        }
+        .print-table { width: 100%; border-collapse: collapse; border: none; }
+        .print-table td { border: none; padding: 0; }
         
-        {/* 1. Identificação da Diligência */}
-        <RelatorioHeader title="1. Identificação da Diligência" />
-        <ResumoItem label="Instituição" value={<strong>{analise.data.nomeCreche || analise.data.nomeEscola}</strong>} />
-        <ResumoItem label="Tipo" value={analise.data.tipificacao} />
-        <ResumoItem label="Data da Vistoria" value={new Date(analise.data.timestamp?.toDate() || Date.now()).toLocaleDateString('pt-BR')} />
-        <ResumoItem label="Responsável pela Vistoria" value={"(Nome do Responsável)"} />
-        <ResumoItem label="Órgão" value="Câmara Municipal" />
+        .ri-header { display: flex; align-items: center; border-bottom: 1px solid #2d3748; padding-bottom: 12px; margin-bottom: 25px; width: 100%; }
+        .ri-header img { height: 50px !important; width: auto !important; margin-right: 20px; object-fit: contain; }
+        .ri-header-text { flex: 1; text-align: left; }
+        .ri-header-text h1 { font-size: 18pt; margin: 0; color: #1a202c; font-weight: 300; line-height: 1.2; }
+        .ri-header-text p { font-size: 9.5pt; margin: 0; color: #718096; font-weight: 400; text-transform: none; }
+      `}</style>
+
+      <table className="print-table mx-auto max-w-4xl">
+        <thead>
+          <tr>
+            <td>
+              <div className="ri-header pt-4">
+                <img src={logo} alt="Logo" />
+                <div className="ri-header-text">
+                  <h1>Relatório de Diligência Técnica</h1>
+                  <p>Câmara Municipal de Ubatuba — Fiscaliza Ubatuba</p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              {/* === IDENTIFICAÇÃO === */}
+              <RelatorioHeader title="1. Identificação da Diligência" />
+              <ResumoItem label="Instituição" value={<strong>{analise.data.nomeCreche || analise.data.nomeEscola}</strong>} />
+              <ResumoItem label="Tipo" value={analise.data.tipificacao} />
+              <ResumoItem label="Data da Vistoria" value={new Date(analise.data.timestamp?.toDate() || Date.now()).toLocaleDateString('pt-BR')} />
+              <ResumoItem label="Órgão" value="Câmara Municipal" />
 
         {/* 2. Objetivo da Vistoria */}
         <RelatorioHeader title="2. Objetivo da Vistoria" />
@@ -304,15 +332,18 @@ export default function Relatorio({ data }: RelatorioProps) {
             Recomenda-se o seguimento rigoroso das ações corretivas listadas.
         </p>
 
-        {/* 9. Responsável e Assinatura */}
         <div className="mt-20 text-center print:mt-12">
             <div className="inline-block border-t-2 border-gray-700 px-10 py-2">
-                <p className="font-bold">{"(Nome do Responsável)"}</p>
+                <p className="font-bold">{(user?.email ? "Responsável pela Vistoria" : "(Nome do Responsável)")}</p>
                 <p className="text-sm">Responsável pela Vistoria</p>
                 <p className="text-sm">Câmara Municipal</p>
+                {user?.email && <p className="text-sm text-gray-600">{user.email}</p>}
             </div>
         </div>
-      </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

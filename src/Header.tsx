@@ -7,7 +7,7 @@ const Header = () => {
   const { user, isAdmin, logout } = useAuth();
 
   return (
-    <header className="bg-card text-text-primary p-4 flex flex-col md:flex-row justify-between items-center shadow-md gap-y-4 md:gap-y-0">
+    <header className="bg-card text-text-primary p-4 flex flex-col md:flex-row justify-between items-center shadow-md gap-y-4 md:gap-y-0 no-print">
       <Link to="/" className="flex items-center gap-4 self-start md:self-center">
         <img src={logo} alt="Brasão da Câmara de Ubatuba" className="h-12 w-auto" />
         <span className="text-xl font-bold whitespace-nowrap">Fiscaliza Ubatuba</span>

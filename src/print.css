@@ -11,11 +11,12 @@
     overflow: visible !important;
   }
 
-  /* Garante que todos os contêineres pais permitam a quebra de página */
-  * {
+  /* Removemos o reset genérico em * que estava quebrando o tamanho de imagens e outros elementos fixos */
+  
+  /* Garante que elementos estruturais permitam a quebra de página */
+  .printable-content, section, article, div:not([class*="fixed"]) {
     overflow: visible !important;
     height: auto !important;
-    max-height: none !important;
   }
 
   .no-print {

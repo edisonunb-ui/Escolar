@@ -38,10 +38,9 @@ export default function PesquisasSalvas() {
         };
       });
       todasPesquisas.sort((a, b) => {
-        if (a.timestamp && b.timestamp) {
-          return b.timestamp.toMillis() - a.timestamp.toMillis();
-        }
-        return 0;
+        const timeA = a.timestamp?.toMillis() || 0;
+        const timeB = b.timestamp?.toMillis() || 0;
+        return timeB - timeA;
       });
 
       setPesquisas(todasPesquisas);

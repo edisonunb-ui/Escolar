@@ -9,6 +9,7 @@ interface DiligenciaResumo {
   nome: string;
   tipo: 'Creche' | 'Escola';
   data: string;
+  timestamp?: any;
 }
 
 export default function DashboardPage() {
@@ -27,8 +28,17 @@ export default function DashboardPage() {
             nome: d.nomeCreche || d.nomeEscola || 'Sem Nome',
             tipo: (d.tipificacao === 'Creche' ? 'Creche' : 'Escola') as 'Creche' | 'Escola',
             data: d.timestamp?.toDate().toLocaleDateString('pt-BR') || 'Data não disponível',
+            timestamp: d.timestamp
           };
         });
+
+        // Ordenar por data decrescente (mais recente primeiro)
+        lista.sort((a, b) => {
+          const timeA = a.timestamp?.toMillis() || 0;
+          const timeB = b.timestamp?.toMillis() || 0;
+          return timeB - timeA;
+        });
+
         setDiligencias(lista);
       } catch (err) {
         console.error("Erro ao buscar diligências:", err);

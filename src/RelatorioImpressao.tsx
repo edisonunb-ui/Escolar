@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { checklistCreche, checklistEscola, ItemVerificacao, RiscoNivel } from './diligenciaConfig';
 import logo from '/logo-camara.png';
+import { useAuth } from './AuthContext';
 
 interface RelatorioImpressaoProps {
   data: any;
@@ -39,6 +40,8 @@ const getRiscoLabel = (risco: RiscoNivel): string => {
 };
 
 export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
+  const { user } = useAuth();
+
   const analise = useMemo(() => {
     if (!data || !data.respostas) return null;
 
@@ -418,6 +421,7 @@ export default function RelatorioImpressao({ data }: RelatorioImpressaoProps) {
         <div className="ri-assinatura">
           <p style={{ fontWeight: 'bold' }}>Responsável pela Vistoria</p>
           <p>Câmara Municipal de Ubatuba</p>
+          {user?.email && <p style={{ fontSize: '10pt', color: '#4a5568' }}>{user.email}</p>}
           <p>{dataVistoria}</p>
         </div>
       </div>

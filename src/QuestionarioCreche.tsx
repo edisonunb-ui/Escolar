@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { crecheNames, unidadesEnsino } from './escolas';
+import logo from '/logo-camara.png';
 import { checklistCreche, ItemVerificacao } from './diligenciaConfig';
 import CameraComponent from './CameraComponent';
 import { uploadImage } from './firebaseStorage';
@@ -131,21 +132,10 @@ const VerificationItem: React.FC<{
     );
 };
 
-// --- Componente Principal ---
 export default function QuestionarioCreche({ initialData, isReadOnly = false }: QuestionarioCrecheProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({ 
-    nomeCreche: '', 
-    nomeDiretor: '', 
-    totalAlunos: '', 
-    alunosFrequentando: '', 
-    evasao: '', 
-    prestacaoContas: '', 
-    tipificacaoUnidade: 'Creche',
-    regiao: '',
-    endereco: '',
-    bairro: '',
-    telefone: '',
+    nomeCreche: '', nomeDiretor: '', totalAlunos: '', alunosFrequentando: '', evasao: '', prestacaoContas: '', tipificacaoUnidade: 'Creche', regiao: '', endereco: '', bairro: '', telefone: '',
     respostas: getInitialAnswers(), 
     fotosGerais: {},
     quadroFuncionalCreche: {
@@ -155,408 +145,166 @@ export default function QuestionarioCreche({ initialData, isReadOnly = false }: 
         merendeiras: { quantidade: '', vinculo: '', observacao: '' },
         outros: { quantidade: '', vinculo: '', observacao: '' },
     },
-    observacoesCreche: {
-        gerais: '',
-        adequacoes: '',
-        orientacoesCAE: '',
-    }
+    observacoesCreche: { gerais: '', adequacoes: '', orientacoesCAE: '' }
   });
 
-  // Efeito para auto-preencher dados da creche
   useEffect(() => {
     if (formData.nomeCreche && !isReadOnly) {
       const unidade = unidadesEnsino.find(u => u.nome === formData.nomeCreche);
-      if (unidade) {
-        setFormData(prev => ({
-          ...prev,
-          regiao: unidade.regiao,
-          endereco: unidade.endereco,
-          bairro: unidade.bairro,
-          telefone: unidade.telefone
-        }));
-      }
+      if (unidade) setFormData(prev => ({ ...prev, regiao: unidade.regiao, endereco: unidade.endereco, bairro: unidade.bairro, telefone: unidade.telefone }));
     }
   }, [formData.nomeCreche, isReadOnly]);
+
   const [activeSection, setActiveSection] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [currentPhotoTarget, setCurrentPhotoTarget] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  
   const [localPhotoPreviews, setLocalPhotoPreviews] = useState<Record<string, string[]>>({});
   const [localPhotosData, setLocalPhotosData] = useState<Record<string, string[]>>({});
-
-  useEffect(() => {
-    return () => {
-      Object.values(localPhotoPreviews).flat().forEach(URL.revokeObjectURL);
-    };
-  }, [localPhotoPreviews]);
 
   const secoes = useMemo(() => {
       const grouped = checklistCreche.reduce((acc, item) => {
         const secao = item.secao || 'Geral';
-        if (!acc[secao]) { acc[secao] = { titulo: secao, subsecoes: {} }; }
+        if (!acc[secao]) acc[secao] = { titulo: secao, subsecoes: {} };
         const subSecao = item.subSecao || 'Itens';
-        if (!acc[secao].subsecoes[subSecao]) { acc[secao].subsecoes[subSecao] = []; }
+        if (!acc[secao].subsecoes[subSecao]) acc[secao].subsecoes[subSecao] = [];
         acc[secao].subsecoes[subSecao].push(item);
         return acc;
       }, {} as Record<string, { titulo: string; subsecoes: Record<string, ItemVerificacao[]> }>);
 
-      const secoesOrdenadas = Object.values(grouped).map(g => ({ 
-        titulo: g.titulo, 
-        type: 'checklist',
-        subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) 
-      }));
-
-      const secoesFinal = [
+      const secoesOrdenadas = Object.values(grouped).map(g => ({ titulo: g.titulo, type: 'checklist', subsecoes: Object.entries(g.subsecoes).map(([subTitulo, itens]) => ({ titulo: subTitulo, itens })) }));
+      return [
         { titulo: '1. Dados de Identificação e Tipificação', type: 'id', subsecoes: [] },
-        { 
-            titulo: '2. Quadro Funcional e Recursos Humanos', 
-            type: 'quadro', 
-            subsecoes: secoesOrdenadas.find(s => s.titulo.includes('2.'))?.subsecoes || [] 
-        },
-        ...(secoesOrdenadas.filter(s => s.titulo.includes('3. Gestão Financeira'))),
-        ...(secoesOrdenadas.filter(s => s.titulo.includes('4. Avaliação Estrutural'))),
-        ...(secoesOrdenadas.filter(s => s.titulo.includes('5. Avaliação da Cozinha'))),
-        ...(secoesOrdenadas.filter(s => s.titulo.includes('6. Áreas Específicas'))),
-        ...(secoesOrdenadas.filter(s => s.titulo.includes('7. Cuidado, Interação'))),
+        { titulo: '2. Quadro Funcional e Recursos Humanos', type: 'quadro', subsecoes: secoesOrdenadas.find(s => s.titulo.includes('2.'))?.subsecoes || [] },
+        ...(secoesOrdenadas.filter(s => !s.titulo.includes('2.'))),
         { titulo: '8. Observações e Adequações', type: 'observacoes', subsecoes: [] }
       ];
-
-      return secoesFinal;
   }, []);
 
-
   useEffect(() => {
-    if (initialData) {
-      setFormData(prev => ({ 
-        ...prev, 
-        ...initialData, 
-        id: initialData.id, 
-        respostas: getInitialAnswers(initialData),
-        quadroFuncionalCreche: initialData.quadroFuncionalCreche || prev.quadroFuncionalCreche,
-        observacoesCreche: initialData.observacoesCreche || prev.observacoesCreche,
-        regiao: initialData.regiao || prev.regiao,
-        endereco: initialData.endereco || prev.endereco,
-        bairro: initialData.bairro || prev.bairro,
-        telefone: initialData.telefone || prev.telefone
-      }));
-      setLocalPhotoPreviews({});
-      setLocalPhotosData({});
-    }
+    if (initialData) setFormData(prev => ({ ...prev, ...initialData, respostas: getInitialAnswers(initialData) }));
   }, [initialData]);
 
-  const handleFieldChange = (field: keyof Omit<FormData, 'respostas' | 'fotosGerais'>, value: any) => {
-    if (isReadOnly) return;
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleAnswerChange = (itemId: string, value: Partial<RespostaItem>) => {
-    if (isReadOnly) return;
-    setFormData(prev => ({ ...prev, respostas: { ...prev.respostas, [itemId]: { ...prev.respostas[itemId], ...value } } }));
-  };
-
-  const handleOpenCamera = (targetId: string) => {
-    if (!formData.nomeCreche && !isReadOnly) {
-        alert('Por favor, selecione uma creche antes de adicionar fotos.');
-        setActiveSection(0);
-        return;
-    }
-    setCurrentPhotoTarget(targetId);
-    setIsCameraOpen(true);
-  };
-
+  const handleFieldChange = (field: keyof Omit<FormData, 'respostas' | 'fotosGerais'>, value: any) => !isReadOnly && setFormData(prev => ({ ...prev, [field]: value }));
+  const handleAnswerChange = (itemId: string, value: Partial<RespostaItem>) => !isReadOnly && setFormData(prev => ({ ...prev, respostas: { ...prev.respostas, [itemId]: { ...prev.respostas[itemId], ...value } } }));
+  const handleOpenCamera = (targetId: string) => { setCurrentPhotoTarget(targetId); setIsCameraOpen(true); };
   const handleCapture = (dataUrl: string, blob: Blob) => {
-    if (!currentPhotoTarget) return;
-    const previewUrl = URL.createObjectURL(blob);
-
-    setLocalPhotoPreviews(prev => ({ ...prev, [currentPhotoTarget]: [...(prev[currentPhotoTarget] || []), previewUrl] }));
-    setLocalPhotosData(prev => ({ ...prev, [currentPhotoTarget]: [...(prev[currentPhotoTarget] || []), dataUrl] }));
-
-    setIsCameraOpen(false);
-    setCurrentPhotoTarget(null);
+     const previewUrl = URL.createObjectURL(blob);
+     setLocalPhotoPreviews(prev => ({ ...prev, [currentPhotoTarget!]: [...(prev[currentPhotoTarget!] || []), previewUrl] }));
+     setLocalPhotosData(prev => ({ ...prev, [currentPhotoTarget!]: [...(prev[currentPhotoTarget!] || []), dataUrl] }));
+     setIsCameraOpen(false);
   };
-
   const handleSaveAndNext = async () => {
-    if (isSaving) return;
-
-    if (activeSection === 0) {
-        if (!formData.nomeCreche || !formData.nomeDiretor || !formData.totalAlunos || !formData.alunosFrequentando || !formData.evasao || !formData.prestacaoContas) {
-            alert('Por favor, preencha todos os campos de identificação para prosseguir.');
-            return;
-        }
-    }
-
-    if (activeSection === 1) {
-        // Validação obrigatória do Quadro Funcional (seção 1 agora)
-        const qf = formData.quadroFuncionalCreche;
-        const camposObrigatorios = [
-            { val: qf.berçário.quantidade, label: 'Quantidade Berçário' },
-            { val: qf.miniGrupos.quantidade, label: 'Quantidade Mini Grupos' },
-            { val: qf.profEfetivos.quantidade, label: 'Professores Efetivos' },
-            { val: qf.merendeiras.quantidade, label: 'Merendeiras' },
-            { val: qf.outros.quantidade, label: 'Outros Funcionários' }
-        ];
-
-        const faltando = camposObrigatorios.filter(c => c.val === '');
-        if (faltando.length > 0) {
-            alert(`Por favor, preencha a quantidade para: ${faltando.map(f => f.label).join(', ')}. Caso não possua, preencha com 0.`);
-            return;
-        }
-    }
-
     setIsSaving(true);
     try {
       const crechePath = sanitizeForPath(formData.nomeCreche);
       let currentDocId = formData.id;
-
       if (!currentDocId) {
-        const docData = { 
-            timestamp: serverTimestamp(), 
-            tipificacao: 'Creche',
-            ...formData
-        };
-        const docRef = await addDoc(collection(db, 'diligencias'), docData);
+        const docRef = await addDoc(collection(db, 'diligencias'), { tipificacao: 'Creche', ...formData, timestamp: serverTimestamp() });
         currentDocId = docRef.id;
-        setFormData(prev => ({ ...prev, id: currentDocId }));
       }
-
       const updatedRespostas = JSON.parse(JSON.stringify(formData.respostas));
       for (const targetId in localPhotosData) {
         const photoList = localPhotosData[targetId];
-        if (photoList && photoList.length > 0) {
-          const uploadedUrls = await Promise.all(
-            photoList.map((photoDataUrl, index) => {
-              const timestamp = Date.now();
-              const fileName = `${sanitizeForPath(targetId)}-${timestamp}-${index}.jpg`;
-              const path = `diligencias/${crechePath}/${currentDocId}/${fileName}`;
-              return uploadImage(path, photoDataUrl);
-            })
-          );
-          updatedRespostas[targetId].fotos = [
-              ...(updatedRespostas[targetId].fotos || []), 
-              ...uploadedUrls
-          ];
-        }
+        const uploadedUrls = await Promise.all(photoList.map((photoDataUrl, index) => uploadImage(`diligencias/${crechePath}/${currentDocId}/${targetId}-${index}.jpg`, photoDataUrl)));
+        updatedRespostas[targetId].fotos = [...(updatedRespostas[targetId].fotos || []), ...uploadedUrls];
       }
-
-      const finalDataToSave = {
-        ...formData,
-        respostas: updatedRespostas,
-        timestamp: serverTimestamp(),
-        tipificacao: 'Creche'
-      };
-
-      await updateDoc(doc(db, 'diligencias', currentDocId), finalDataToSave);
-
-      setFormData(prev => ({...prev, respostas: updatedRespostas}));
-      setLocalPhotoPreviews({});
-      setLocalPhotosData({});
-
-      if (activeSection < secoes.length - 1) {
-          setActiveSection(activeSection + 1);
-      } else {
-          alert('Diligência finalizada e salva com sucesso!');
-          navigate('/');
-      }
-
-    } catch (error) {
-      console.error("Erro ao salvar a diligência: ", error);
-      alert('Ocorreu um erro ao salvar. Verifique o console para mais detalhes.');
-    } finally {
-      setIsSaving(false);
-    }
+      await updateDoc(doc(db, 'diligencias', currentDocId), { ...formData, id: currentDocId, respostas: updatedRespostas, timestamp: serverTimestamp() });
+      if (activeSection < secoes.length - 1) setActiveSection(activeSection + 1);
+      else { alert('Salvo!'); navigate('/'); }
+    } catch (e) { console.error(e); alert('Erro!'); } finally { setIsSaving(false); }
   };
 
-  const isIdentificationComplete = !!formData.nomeCreche && !!formData.nomeDiretor && !!formData.totalAlunos && !!formData.alunosFrequentando && !!formData.evasao && !!formData.prestacaoContas;
+  const isIdentificationComplete = !!formData.nomeCreche && !!formData.nomeDiretor;
 
   return (
-    <div className="p-2 sm:p-4 max-w-5xl mx-auto bg-gray-900 text-white">
-        {isCameraOpen && <CameraComponent onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}
-
-        {/* Lightbox para visualizar fotos em tamanho original */}
-        {lightboxUrl && (
-          <div
-            className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 cursor-pointer"
-            onClick={() => setLightboxUrl(null)}
-          >
-            <button
-              onClick={() => setLightboxUrl(null)}
-              className="absolute top-4 right-4 text-white text-3xl font-bold bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/80 transition-colors z-10"
-              aria-label="Fechar"
-            >
-              ×
-            </button>
-            <img
-              src={lightboxUrl}
-              alt="Foto em tamanho original"
-              className="max-w-full max-h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        )}
+    <div className="p-2 sm:p-4 max-w-5xl mx-auto bg-gray-900 text-white print:bg-white print:text-black">
+        <style>{`
+            @media print {
+                .print-only { display: block !important; }
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .ri-header { display: flex; align-items: center; border-bottom: 1px solid #2d3748; padding-bottom: 12px; margin-bottom: 25px; width: 100%; }
+                .ri-header img { height: 50px !important; margin-right: 20px; object-fit: contain; }
+                .ri-header-text h1 { font-size: 18pt; color: #1a202c; font-weight: 300; }
+                .ri-header-text p { font-size: 9.5pt; color: #718096; }
+            }
+            .print-only { display: none; }
+        `}</style>
         
-        <h1 className="text-xl sm:text-2xl font-bold mb-4">{isReadOnly ? `Visualizando: ${formData.nomeCreche}` : '👶 Checklist de Conformidade — Creches'}</h1>
+        <div className="print-only ri-header pt-4">
+            <img src={logo} alt="Logo" />
+            <div className="ri-header-text">
+                <h1>Relatório de Diligência Técnica</h1>
+                <p>Câmara Municipal de Ubatuba — Fiscaliza Ubatuba</p>
+            </div>
+            <div className="mb-4 border-b pb-2">
+                <h2 className="text-xl font-bold">{formData.nomeCreche}</h2>
+                <p className="text-sm text-gray-600">Data: {new Date().toLocaleDateString('pt-BR')}</p>
+            </div>
+        </div>
 
-        {secoes.map((sec: any, secIndex) => (
+        <div className="no-print">
+            {isCameraOpen && <CameraComponent onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}
+            {lightboxUrl && <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center" onClick={() => setLightboxUrl(null)}><img src={lightboxUrl} className="max-w-full max-h-full" alt="Original" /></div>}
+        </div>
+
+        <h1 className="text-xl sm:text-2xl font-bold mb-4 no-print">{isReadOnly ? `Creche: ${formData.nomeCreche}` : '👶 Checklist Creches'}</h1>
+
+        {secoes.map((sec, secIndex) => (
             <div key={secIndex} className={isReadOnly || activeSection === secIndex ? 'block mb-8' : 'hidden'}>
                 {sec.type === 'id' && (
                     <Section title={sec.titulo}>
                         <label className="block mb-2 text-sm font-medium">Nome da Creche *</label>
-                        <select name="nomeCreche" value={formData.nomeCreche} onChange={e => handleFieldChange('nomeCreche', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly || !!initialData}>
-                            <option value="">Selecione uma creche</option>
-                            {crecheNames.map(name => <option key={name} value={name}>{name}</option>)}
-                        </select>
-
-                        <div className="mt-4">
-                            <label className="block mb-2 text-sm font-medium">Tipificação *</label>
-                            <div className="flex gap-4 items-center text-sm">
-                                {['Creche', 'Pré-Escola'].map(t => (
-                                    <label key={t} className="flex items-center gap-2">
-                                        <input type="radio" value={t} checked={formData.tipificacaoUnidade === t} onChange={e => handleFieldChange('tipificacaoUnidade', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> {t}
-                                    </label>
-                                ))}
-                            </div>
+                        <select value={formData.nomeCreche} onChange={e => handleFieldChange('nomeCreche', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}><option value="">Selecione...</option>{crecheNames.map(n => <option key={n} value={n}>{n}</option>)}</select>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div><label className="block text-sm">Diretor(a)</label><input type="text" value={formData.nomeDiretor} onChange={e => handleFieldChange('nomeDiretor', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly} /></div>
+                            <div><label className="block text-sm">Tipificação</label><select value={formData.tipificacaoUnidade} onChange={e => handleFieldChange('tipificacaoUnidade', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}><option value="Creche">Creche</option><option value="Pré-Escola">Pré-Escola</option></select></div>
                         </div>
-
-                        <label className="block mt-4 mb-2 text-sm font-medium">Nome do(a) Diretor(a) *</label>
-                        <input type="text" value={formData.nomeDiretor} onChange={e => handleFieldChange('nomeDiretor', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
-
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                            <div>
-                                <label className="block mb-2 text-sm font-medium">Total de Alunos *</label>
-                                <input type="number" value={formData.totalAlunos} onChange={e => handleFieldChange('totalAlunos', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
-                            </div>
-                            <div>
-                                <label className="block mb-2 text-sm font-medium">Alunos Frequentando *</label>
-                                <input type="number" value={formData.alunosFrequentando} onChange={e => handleFieldChange('alunosFrequentando', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
-                            </div>
-                            <div>
-                                <label className="block mb-2 text-sm font-medium">Evasão *</label>
-                                <input type="number" value={formData.evasao} onChange={e => handleFieldChange('evasao', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded disabled:opacity-50" disabled={isReadOnly} />
-                            </div>
-                        </div>
-                        
-                        <label className="block mt-4 mb-2 text-sm font-medium">Periodicidade da Prestação de Contas *</label>
-                        <div className="flex gap-4 items-center text-sm">
-                            <label className="flex items-center gap-2"><input type="radio" value="Mensal" name="prestacaoContas" checked={formData.prestacaoContas === 'Mensal'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Mensal</label>
-                            <label className="flex items-center gap-2"><input type="radio" value="Trimestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Trimestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Trimestral</label>
-                            <label className="flex items-center gap-2"><input type="radio" value="Semestral" name="prestacaoContas" checked={formData.prestacaoContas === 'Semestral'} onChange={e => handleFieldChange('prestacaoContas', e.target.value)} disabled={isReadOnly} className="h-4 w-4 bg-gray-800 border-gray-600"/> Semestral</label>
-                        </div>
-
-                        {/* Campos auto-preenchidos */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold">Região</p>
-                                <p className="text-sm">{formData.regiao || '—'}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold">Telefone</p>
-                                <p className="text-sm">{formData.telefone || '—'}</p>
-                            </div>
-                            <div className="md:col-span-2">
-                                <p className="text-xs text-gray-500 uppercase font-bold">Endereço</p>
-                                <p className="text-sm">{formData.endereco ? `${formData.endereco} - ${formData.bairro}` : '—'}</p>
-                            </div>
+                           <div><label className="block text-sm">Total Alunos</label><input type="number" value={formData.totalAlunos} onChange={e => handleFieldChange('totalAlunos', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly} /></div>
+                           <div><label className="block text-sm">Freq. Alunos</label><input type="number" value={formData.alunosFrequentando} onChange={e => handleFieldChange('alunosFrequentando', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly} /></div>
+                           <div><label className="block text-sm">Evasão</label><input type="number" value={formData.evasao} onChange={e => handleFieldChange('evasao', e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly} /></div>
                         </div>
                     </Section>
                 )}
-
-                {sec.type === 'checklist' && (
-                     <Section title={sec.titulo}>
-                        {sec.subsecoes.map((sub: any) => (
-                            <SubSection key={sub.titulo} title={sub.titulo}>
-                                {sub.itens.map((item: any) => (
-                                    <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
-                                ))}
-                            </SubSection>
-                        ))}
-                    </Section>
-                )}
-
                 {sec.type === 'quadro' && (
                     <Section title={sec.titulo}>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-gray-700">
-                                        <th className="py-2 px-1">Função / Categoria</th>
-                                        <th className="py-2 px-1 w-24 text-center">Quantidade</th>
-                                        <th className="py-2 px-1">Vínculo Empregatício</th>
-                                        <th className="py-2 px-1">Observações</th>
-                                    </tr>
-                                </thead>
+                            <table className="w-full text-sm">
+                                <thead><tr className="border-b border-gray-700"><th className="text-left py-2">Função</th><th className="text-center py-2">Qtd</th><th className="text-left py-2">Vínculo</th><th className="text-left py-2">OBS</th></tr></thead>
                                 <tbody>
-                                    {[
-                                        { id: 'berçário', label: 'Agentes Educacionais/Cuidadores (Berçário)' },
-                                        { id: 'miniGrupos', label: 'Agentes Educacionais/Cuidadores (Mini-Grupos)' },
-                                        { id: 'profEfetivos', label: 'Professores Efetivos' },
-                                        { id: 'merendeiras', label: 'Merendeiras' },
-                                        { id: 'outros', label: 'Outros Funcionários' },
-                                    ].map(row => (
-                                        <tr key={row.id} className="border-b border-gray-800 last:border-0">
-                                            <td className="py-2 px-1">{row.label}</td>
-                                            <td className="py-2 px-1 text-center">
-                                                <input type="text" value={formData.quadroFuncionalCreche[row.id].quantidade} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], quantidade: e.target.value } } }))} className="w-16 p-1 bg-gray-800 border border-gray-700 rounded text-center" disabled={isReadOnly} />
-                                            </td>
-                                            <td className="py-2 px-1">
-                                                <select value={formData.quadroFuncionalCreche[row.id].vinculo} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], vinculo: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" disabled={isReadOnly}>
-                                                    <option value="">Selecione...</option>
-                                                    <option value="Contrato">Contrato</option>
-                                                    <option value="Concurso">Concurso</option>
-                                                </select>
-                                            </td>
-                                            <td className="py-2 px-1">
-                                                <input type="text" value={formData.quadroFuncionalCreche[row.id].observacao} onChange={e => setFormData(prev => ({ ...prev, quadroFuncionalCreche: { ...prev.quadroFuncionalCreche, [row.id]: { ...prev.quadroFuncionalCreche[row.id], observacao: e.target.value } } }))} className="w-full p-1 bg-gray-800 border border-gray-700 rounded" placeholder="..." disabled={isReadOnly} />
-                                            </td>
+                                    {Object.entries(formData.quadroFuncionalCreche).map(([id, val]) => (
+                                        <tr key={id} className="border-b border-gray-800">
+                                            <td className="py-2">{id}</td>
+                                            <td className="py-2 text-center"><input type="text" value={val.quantidade} onChange={e => setFormData(prev => ({...prev, quadroFuncionalCreche: {...prev.quadroFuncionalCreche, [id]: {...val, quantidade: e.target.value}}}))} className="w-16 bg-gray-800 border border-gray-700 text-center" /></td>
+                                            <td className="py-2"><select value={val.vinculo} onChange={e => setFormData(prev => ({...prev, quadroFuncionalCreche: {...prev.quadroFuncionalCreche, [id]: {...val, vinculo: e.target.value}}}))} className="bg-gray-800 border border-gray-700"><option value="">Sel...</option><option value="Contrato">Contrato</option><option value="Concurso">Concurso</option></select></td>
+                                            <td className="py-2"><input type="text" value={val.observacao} onChange={e => setFormData(prev => ({...prev, quadroFuncionalCreche: {...prev.quadroFuncionalCreche, [id]: {...val, observacao: e.target.value}}}))} className="w-full bg-gray-800 border border-gray-700" /></td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-
-                        {/* Checklist items for this section (e.g. Specialists Room) */}
-                        {sec.subsecoes.length > 0 && (
-                            <div className="mt-8 pt-4 border-t border-gray-700">
-                                {sec.subsecoes.map((sub: any) => (
-                                    <SubSection key={sub.titulo} title={sub.titulo}>
-                                        {sub.itens.map((item: any) => (
-                                            <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>
-                                        ))}
-                                    </SubSection>
-                                ))}
-                            </div>
-                        )}
                     </Section>
                 )}
-
+                {sec.type === 'checklist' && (
+                    <Section title={sec.titulo}>
+                        {sec.subsecoes.map((sub: any) => <SubSection key={sub.titulo} title={sub.titulo}>{sub.itens.map((item: any) => <VerificationItem key={item.id} item={item} resposta={formData.respostas[item.id]} localPhotos={localPhotoPreviews[item.id] || []} onChange={handleAnswerChange} onOpenCamera={handleOpenCamera} onImageClick={setLightboxUrl} disabled={isReadOnly}/>)}</SubSection>)}
+                    </Section>
+                )}
                 {sec.type === 'observacoes' && (
                     <Section title={sec.titulo}>
                         <div className="space-y-4">
-                            <div>
-                                <label className="block mb-1 text-sm font-medium font-bold text-blue-400">Observações Gerais sobre a Creche:</label>
-                                <textarea value={formData.observacoesCreche.gerais} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, gerais: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
-                            </div>
-                            <div>
-                                <label className="block mb-1 text-sm font-medium font-bold text-red-400">Adequações Prioritárias:</label>
-                                <textarea value={formData.observacoesCreche.adequacoes} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, adequacoes: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
-                            </div>
-                            <div>
-                                <label className="block mb-1 text-sm font-medium font-bold text-yellow-400">Orientação do CAE/Responsável:</label>
-                                <textarea value={formData.observacoesCreche.orientacoesCAE} onChange={e => setFormData(prev => ({ ...prev, observacoesCreche: { ...prev.observacoesCreche, orientacoesCAE: e.target.value } }))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3} disabled={isReadOnly} />
-                            </div>
+                            <div><label className="block text-blue-400">Observações Gerais</label><textarea value={formData.observacoesCreche.gerais} onChange={e => setFormData(prev => ({...prev, observacoesCreche: {...prev.observacoesCreche, gerais: e.target.value}}))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3}/></div>
+                            <div><label className="block text-red-400">Adequações Prioritárias</label><textarea value={formData.observacoesCreche.adequacoes} onChange={e => setFormData(prev => ({...prev, observacoesCreche: {...prev.observacoesCreche, adequacoes: e.target.value}}))} className="w-full p-2 bg-gray-800 border border-gray-700 rounded" rows={3}/></div>
                         </div>
                     </Section>
                 )}
-
                 {!isReadOnly && (
-                    <div className="flex justify-between mt-4">
-                        <button onClick={() => setActiveSection(activeSection - 1)} disabled={activeSection === 0 || isSaving} className="px-6 py-2 bg-gray-600 text-white rounded shadow font-semibold disabled:opacity-50">
-                            Anterior
-                        </button>
-                        <button onClick={handleSaveAndNext} disabled={isSaving || (activeSection === 0 && !isIdentificationComplete)} className="px-6 py-2 bg-primary text-white rounded shadow font-semibold disabled:opacity-50">
-                            {isSaving ? 'Salvando...' : (activeSection === secoes.length - 1 ? 'Finalizar e Salvar' : 'Salvar e Próximo')}
-                        </button>
+                    <div className="flex justify-between mt-4 no-print">
+                        <button onClick={() => setActiveSection(activeSection - 1)} disabled={activeSection === 0 || isSaving} className="px-6 py-2 bg-gray-600 text-white rounded">Anterior</button>
+                        <button onClick={handleSaveAndNext} disabled={isSaving || (activeSection === 0 && !isIdentificationComplete)} className="px-6 py-2 bg-primary text-white rounded">{isSaving ? 'Salvando...' : 'Próximo'}</button>
                     </div>
                 )}
             </div>
