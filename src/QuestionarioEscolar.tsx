@@ -246,17 +246,19 @@ export default function QuestionarioEscolar({ initialData, isReadOnly = false }:
             .print-only { display: none; }
         `}</style>
         
-        <div className="hidden print:flex ri-header pt-4">
-            <img src={logo} alt="Logo" />
-            <div className="ri-header-text">
-                <h1>Relatório de Diligência Técnica</h1>
-                <p>Câmara Municipal de Ubatuba — Fiscaliza Ubatuba</p>
+        {!isReadOnly && (
+            <div className="hidden print:flex ri-header pt-4">
+                <img src={logo} alt="Logo" />
+                <div className="ri-header-text">
+                    <h1>Relatório de Diligência Técnica</h1>
+                    <p>Câmara Municipal de Ubatuba — Fiscaliza Ubatuba</p>
+                </div>
+                <div className="mb-4 border-b pb-2">
+                    <h2 className="text-xl font-bold">{formData.nomeEscola}</h2>
+                    <p className="text-sm text-gray-600">Data: {new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
             </div>
-            <div className="mb-4 border-b pb-2">
-                <h2 className="text-xl font-bold">{formData.nomeEscola}</h2>
-                <p className="text-sm text-gray-600">Data: {new Date().toLocaleDateString('pt-BR')}</p>
-            </div>
-        </div>
+        )}
 
         <div className="no-print">
             {isCameraOpen && <CameraComponent onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}

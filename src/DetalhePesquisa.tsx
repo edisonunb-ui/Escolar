@@ -6,8 +6,10 @@ import { db } from './firebaseConfig';
 import QuestionarioCreche from './QuestionarioCreche';
 import QuestionarioEscolar from './QuestionarioEscolar';
 import RelatorioImpressao from './RelatorioImpressao';
+import { useAuth } from './AuthContext';
 
 export default function DetalhePesquisa() {
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [pesquisa, setPesquisa] = useState<DocumentData | null>(null);
@@ -101,7 +103,7 @@ export default function DetalhePesquisa() {
                 </button>
             </div>
 
-            {confirmingDelete ? (
+            {confirmingDelete && user?.email === 'edisonunb@gmail.com' ? (
               <div className="flex gap-2 justify-end">
                 <button 
                   onClick={handleDelete} 
@@ -118,12 +120,14 @@ export default function DetalhePesquisa() {
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2 justify-end">
-                <button 
-                  onClick={() => setConfirmingDelete(true)}
-                  className="px-6 py-2 bg-red-600/20 text-red-400 border border-red-900/50 rounded-lg shadow font-semibold hover:bg-red-900/30 transition w-full sm:w-auto"
-                >
-                  Excluir
-                </button>
+                {user?.email === 'edisonunb@gmail.com' && (
+                  <button 
+                    onClick={() => setConfirmingDelete(true)}
+                    className="px-6 py-2 bg-red-600/20 text-red-400 border border-red-900/50 rounded-lg shadow font-semibold hover:bg-red-900/30 transition w-full sm:w-auto"
+                  >
+                    Excluir
+                  </button>
+                )}
                 <button 
                   onClick={handlePrint} 
                   className="px-6 py-2 bg-gray-700 text-white rounded-lg shadow font-semibold hover:bg-gray-600 transition w-full sm:w-auto"
